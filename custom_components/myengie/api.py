@@ -97,6 +97,18 @@ class MyEngieAPI:
         """Get banners."""
         return await self._request("POST", f"{API_BASE_URL}/v1/banners")
 
+    async def get_account(self) -> Dict[str, Any]:
+        """Get account data."""
+        return await self._request("GET", f"{API_BASE_URL}/v1/account")
+
+    async def get_user(self) -> Dict[str, Any]:
+        """Get user data."""
+        return await self._request("GET", f"{API_BASE_URL}/v1/user")
+
+    async def get_places(self) -> Dict[str, Any]:
+        """Get places of consumption."""
+        return await self._request("GET", f"{API_BASE_URL}/v1/places")
+
     async def get_places(self) -> Dict[str, Any]:
         """Get places of consumption."""
         return await self._request("GET", f"{API_BASE_URL}/v1/places")
