@@ -14,6 +14,7 @@
       "missing_username": "Username is required",
       "missing_password": "Password is required",
       "invalid_auth": "Invalid credentials. Please check your username and password.",
+      "account_locked": "Account temporarily locked due to too many failed login attempts. Please try again later.",
       "cannot_connect": "Failed to connect to MyEngie services",
       "unknown": "An unexpected error occurred"
     },

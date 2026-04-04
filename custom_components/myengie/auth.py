@@ -29,11 +29,11 @@ class Auth0Manager:
         session: aiohttp.ClientSession,
         username: str, 
         password: str
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """
         Authenticate with Auth0 using username and password.
         
-        Returns True if authentication successful, False otherwise.
+        Returns (success: bool, error_key: str)
         """
         try:
             _LOGGER.debug("Attempting Auth0 authentication for user: %s", username)
@@ -41,6 +41,7 @@ class Auth0Manager:
             # Step 1: Get authorization code using Resource Owner Password Grant
             auth_data = {
                 "client_id": CLIENT_ID,
+                "grant_type": "http://auth0.com/oauth/grant-type/password-realm",
                 "username": username,
                 "password": password,
                 "realm": CLIENT_REALM,
@@ -64,7 +65,7 @@ class Auth0Manager:
                     self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
                     
                     _LOGGER.debug("Auth0 authentication successful")
-                    return True
+                    return True, ""
                 else:
                     error_text = await resp.text()
                     _LOGGER.error(
@@ -72,11 +73,31 @@ class Auth0Manager:
                         resp.status,
                         error_text,
                     )
-                    return False
+                    
+                    # Try to parse error response for better error messages
+                    try:
+                        error_json = json.loads(error_text)
+                        error_type = error_json.get("error", "")
+                        error_description = error_json.get("error_description", "")
+                        
+                        if error_type == "invalid_grant":
+                            _LOGGER.warning("Invalid username/password combination for user: %s", username)
+                        elif error_type == "invalid_client":
+                            _LOGGER.error("Auth0 client configuration error - client_id may be invalid")
+                        elif "temporarily_locked" in error_description.lower():
+                            _LOGGER.warning("Account temporarily locked due to too many failed attempts")
+                        elif "invalid_realm" in error_description.lower():
+                            _LOGGER.error("Auth0 realm configuration error")
+                        else:
+                            _LOGGER.warning("Auth0 authentication failed: %s - %s", error_type, error_description)
+                    except json.JSONDecodeError:
+                        _LOGGER.warning("Auth0 returned non-JSON error response: %s", error_text)
+                    
+                    return False, "invalid_auth"
 
         except Exception as err:
             _LOGGER.error("Auth0 authentication error: %s", err)
-            return False
+            return False, "cannot_connect"
 
     async def refresh_access_token(
         self,

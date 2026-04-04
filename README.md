@@ -117,6 +117,18 @@ After setup, the integration creates the following sensors:
 - Verify your ENGIE credentials are correct
 - Ensure your account is active and not blocked
 - Check if your email has been verified with ENGIE
+- **Account Lockout:** Too many failed attempts may temporarily lock your account
+- **Username Format:** Use your full email address as registered with ENGIE
+
+### Debug Authentication
+Use the included debug script to test authentication outside of Home Assistant:
+
+```bash
+cd /path/to/ha-myEngie
+python3 debug_auth.py
+```
+
+This will help identify if the issue is with credentials or the integration.
 
 ### No Data Available
 - Check Home Assistant logs for error messages

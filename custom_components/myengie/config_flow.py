@@ -40,9 +40,9 @@ class MyEngieConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     self._abort_if_unique_id_configured()
 
                     # Validate credentials with Auth0
-                    valid = await self._validate_credentials(username, password)
+                    valid, error_key = await self._validate_credentials(username, password)
                     if not valid:
-                        errors["base"] = "invalid_auth"
+                        errors["base"] = error_key
                     else:
                         return self.async_create_entry(
                             title=username,
@@ -69,15 +69,19 @@ class MyEngieConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={},
         )
 
-    async def _validate_credentials(self, username: str, password: str) -> bool:
+    async def _validate_credentials(self, username: str, password: str) -> tuple[bool, str]:
         """Validate credentials with Auth0."""
         try:
             async with aiohttp.ClientSession() as session:
                 auth_manager = Auth0Manager()
-                success = await auth_manager.authenticate(session, username, password)
-                return success
+                success, error_key = await auth_manager.authenticate(session, username, password)
+                if not success:
+                    _LOGGER.warning("Auth0 authentication failed for user: %s", username)
+                    return False, error_key or "invalid_auth"
+                return True, ""
         except Exception as err:
             _LOGGER.error("Error validating credentials: %s", err)
+            return False, "cannot_connect"
             return False
 
     async def async_step_import(self, import_data: dict) -> FlowResult:
