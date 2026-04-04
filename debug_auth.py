@@ -28,14 +28,6 @@ class MyEngieAPI:
         self.session = session
         self.auth_manager = auth_manager
 
-    async def get_account(self):
-        """Get account data."""
-        return await self._request("GET", f"{API_BASE_URL}/v1/account")
-
-    async def get_user(self):
-        """Get user data."""
-        return await self._request("GET", f"{API_BASE_URL}/v1/user")
-
     async def get_app_status(self):
         """Get application status."""
         return await self._request("GET", f"{API_BASE_URL}/v2/app_status")
@@ -259,34 +251,6 @@ async def test_auth():
                     print(f"📄 PlacesOfConsumption data: {json.dumps(placesofconsumption_data, indent=2)}")
             except Exception as e:
                 print(f"❌ get_placesofconsumption error: {e}")
-
-            # Test get_user
-            print("\n📡 Testing get_user()...")
-            try:
-                user_data = await api.get_user()
-                if user_data.get('error'):
-                    print(f"❌ get_user failed: {user_data}")
-                else:
-                    print("✅ get_user successful!")
-                    print(f"📊 User data keys: {list(user_data.get('data', {}).keys()) if user_data.get('data') else 'None'}")
-                    if user_data.get('data'):
-                        print(f"📄 User data: {json.dumps(user_data['data'], indent=2)}")
-            except Exception as e:
-                print(f"❌ get_user error: {e}")
-
-            # Test get_places
-            print("\n📡 Testing get_places()...")
-            try:
-                places_data = await api.get_places()
-                if places_data.get('error'):
-                    print(f"❌ get_places failed: {places_data}")
-                else:
-                    print("✅ get_places successful!")
-                    print(f"📊 Places data keys: {list(places_data.get('data', {}).keys()) if places_data.get('data') else 'None'}")
-                    if places_data.get('data'):
-                        print(f"📄 Places data: {json.dumps(places_data['data'], indent=2)}")
-            except Exception as e:
-                print(f"❌ get_places error: {e}")
 
         else:
             print("❌ Authentication failed!")

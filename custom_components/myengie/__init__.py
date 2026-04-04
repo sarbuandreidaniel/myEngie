@@ -245,27 +245,6 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                     self._extract_account_info(invitations.get("data"))
                     _LOGGER.debug("Extracted account info from invitations")
 
-            # If still no contract accounts, try account data
-            if not self.contract_accounts:
-                account = await self.api.get_account()
-                if not account.get("error"):
-                    self._extract_account_info(account.get("data"))
-                    _LOGGER.debug("Extracted account info from account")
-
-            # If still no contract accounts, try user data
-            if not self.contract_accounts:
-                user = await self.api.get_user()
-                if not user.get("error"):
-                    self._extract_account_info(user.get("data"))
-                    _LOGGER.debug("Extracted account info from user")
-
-            # If still no contract accounts, try places
-            if not self.contract_accounts:
-                places = await self.api.get_places()
-                if not places.get("error"):
-                    self._extract_account_info(places.get("data"))
-                    _LOGGER.debug("Extracted account info from places")
-
             # If still no contract accounts, try placesofconsumption
             if not self.contract_accounts:
                 placesofconsumption = await self.api.get_placesofconsumption()
