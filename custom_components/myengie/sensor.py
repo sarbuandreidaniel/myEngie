@@ -36,10 +36,6 @@ async def async_setup_entry(
         MyEngieUpToDateStatusSensor(coordinator, config_entry),
         MyEngieInvoiceCountSensor(coordinator, config_entry),
         MyEngiePendingPaymentsSensor(coordinator, config_entry),
-        
-        # Invoice history and details
-        MyEngieLatestInvoiceSensor(coordinator, config_entry),
-        MyEngieInvoiceHistoryDetailsSensor(coordinator, config_entry),
     ]
 
     async_add_entities(entities)
