@@ -135,7 +135,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                 for key, item in value.items():
                     lower_key = key.lower()
 
-                    if lower_key in ("contract_account", "contract_account_id"):
+                    if lower_key in ("contract_account", "contract_account_id", "contractaccount", "contractAccount", "contract_accountid", "contractAccountId", "contract_account_number", "contractaccountnumber", "contractAccountNumber"):
                         if isinstance(item, (list, tuple)):
                             for x in item:
                                 if x and str(x) not in self.contract_accounts:
@@ -160,7 +160,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                         if item and not self.pod:
                             self.pod = str(item)
                             _LOGGER.debug("Extracted pod: %s from key: %s", self.pod, key)
-                    elif lower_key in ("account_id", "id") and not self.account_id:
+                    elif lower_key in ("account_id", "id", "accountid", "accountId", "poc_number", "pocnumber", "pocNumber"):
                         if item and str(item).isdigit():
                             self.account_id = str(item)
                             _LOGGER.debug("Extracted account_id: %s from key: %s", self.account_id, key)
@@ -176,6 +176,11 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
         if not self.account_id and self.contract_accounts:
             self.account_id = self.contract_accounts[0]
             _LOGGER.debug("Set account_id from contract_accounts: %s", self.account_id)
+
+        # Fallback: if no contract accounts but have account_id, use account_id as contract account
+        if not self.contract_accounts and self.account_id:
+            self.contract_accounts = [self.account_id]
+            _LOGGER.debug("Set contract_accounts from account_id: %s", self.contract_accounts)
 
         # Normalize unique accounts
         self.contract_accounts = list(dict.fromkeys(self.contract_accounts))
@@ -210,7 +215,19 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning("App status check failed: %s", status)
             self._extract_account_info(status.get("data"))
 
-            # Fetch account data - get unread notifications
+            # If no contract accounts found in app status, try invitations
+            if not self.contract_accounts:
+                invitations = await self.api.get_invitations()
+                if not invitations.get("error"):
+                    self._extract_account_info(invitations.get("data"))
+                    _LOGGER.debug("Extracted account info from invitations")
+
+            # If still no contract accounts, try places
+            if not self.contract_accounts:
+                places = await self.api.get_places()
+                if not places.get("error"):
+                    self._extract_account_info(places.get("data"))
+                    _LOGGER.debug("Extracted account info from places")
             notifications = await self.api.get_unread_notifications()
             notification_count = 0
             if not notifications.get("error"):
