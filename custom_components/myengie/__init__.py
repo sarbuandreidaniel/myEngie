@@ -317,6 +317,11 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
             else:
                 _LOGGER.warning("No contract accounts available, skipping balance widget fetch")
 
+            # Fallback: if poc_number exists but installation_number doesn't, use poc_number as installation_number
+            if self.poc_number and not self.installation_number:
+                self.installation_number = self.poc_number
+                _LOGGER.debug("Set installation_number from poc_number: %s", self.installation_number)
+
             # Get notifications banner if account ID and PA available
             banners = []
             if self.account_id and self.provider_account_id:

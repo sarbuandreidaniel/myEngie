@@ -55,6 +55,50 @@ class MyEngieAPI:
         """Get places of consumption data."""
         return await self._request("GET", f"{API_BASE_URL}/v1/placesofconsumption")
 
+    async def get_balance_details(self, contract_accounts):
+        """Get balance and invoice details."""
+        from aiohttp import FormData
+        data = FormData()
+        for account in contract_accounts:
+            data.add_field("contract_account[]", account)
+
+        return await self._request(
+            "POST",
+            f"{API_BASE_URL}/v1/invoices/ballance-details",
+            data=data,
+        )
+
+    async def get_balance_widget(self, contract_accounts):
+        """Get balance widget data."""
+        from aiohttp import FormData
+        data = FormData()
+        for account in contract_accounts:
+            data.add_field("contract_account[]", account)
+
+        return await self._request(
+            "POST",
+            f"{API_BASE_URL}/v1/widgets/ballance",
+            data=data,
+        )
+
+    async def get_invitations(self):
+        """Get user invitations."""
+        return await self._request("GET", f"{API_BASE_URL}/v1/invitations")
+
+    async def get_index_data(self, poc_number, division, pa, installation_number):
+        """Get gas/electricity index data."""
+        params = {
+            "poc_number": poc_number,
+            "division": division,
+            "pa": pa,
+            "installation_number": installation_number,
+        }
+        return await self._request(
+            "GET",
+            f"{API_BASE_URL}/v1/index/{poc_number}",
+            params=params,
+        )
+
     async def _request(self, method, url, params=None, data=None):
         """Make API request with automatic token refresh."""
         access_token = self.auth_manager.access_token
@@ -239,18 +283,67 @@ async def test_auth():
             except Exception as e:
                 print(f"❌ userinfo error: {e}")
 
-            # Test get_placesofconsumption
-            print("\n📡 Testing get_placesofconsumption()...")
+            # Test get_invitations
+            print("\n📡 Testing get_invitations()...")
             try:
-                placesofconsumption_data = await api.get_placesofconsumption()
-                if placesofconsumption_data.get('error'):
-                    print(f"❌ get_placesofconsumption failed: {placesofconsumption_data}")
+                invitations_data = await api.get_invitations()
+                if invitations_data.get('error'):
+                    print(f"❌ get_invitations failed: {invitations_data}")
                 else:
-                    print("✅ get_placesofconsumption successful!")
-                    print(f"📊 PlacesOfConsumption data keys: {list(placesofconsumption_data.keys())}")
-                    print(f"📄 PlacesOfConsumption data: {json.dumps(placesofconsumption_data, indent=2)}")
+                    print("✅ get_invitations successful!")
+                    print(f"📊 Invitations data keys: {list(invitations_data.keys())}")
+                    print(f"📄 Invitations data: {json.dumps(invitations_data, indent=2)}")
             except Exception as e:
-                print(f"❌ get_placesofconsumption error: {e}")
+                print(f"❌ get_invitations error: {e}")
+
+            # Test get_balance_details
+            print("\n📡 Testing get_balance_details()...")
+            try:
+                contract_accounts = ["2103540725"]  # From placesofconsumption data
+                balance_details_data = await api.get_balance_details(contract_accounts)
+                if balance_details_data.get('error'):
+                    print(f"❌ get_balance_details failed: {balance_details_data}")
+                else:
+                    print("✅ get_balance_details successful!")
+                    print(f"📊 Balance details data keys: {list(balance_details_data.keys())}")
+                    print(f"📄 Balance details data: {json.dumps(balance_details_data, indent=2)}")
+            except Exception as e:
+                print(f"❌ get_balance_details error: {e}")
+
+            # Test get_balance_widget
+            print("\n📡 Testing get_balance_widget()...")
+            try:
+                balance_widget_data = await api.get_balance_widget(contract_accounts)
+                if balance_widget_data.get('error'):
+                    print(f"❌ get_balance_widget failed: {balance_widget_data}")
+                else:
+                    print("✅ get_balance_widget successful!")
+                    print(f"📊 Balance widget data keys: {list(balance_widget_data.keys())}")
+                    print(f"📄 Balance widget data: {json.dumps(balance_widget_data, indent=2)}")
+            except Exception as e:
+                print(f"❌ get_balance_widget error: {e}")
+
+            # Test get_index_data (if we have the required params)
+            print("\n📡 Testing get_index_data()...")
+            divisions = ["gaz", "GAZ", "electric", "ELECTRIC", "electricitate"]
+            for division in divisions:
+                try:
+                    print(f"Trying division: {division}")
+                    index_data = await api.get_index_data(
+                        poc_number="5002533828",
+                        division=division,
+                        pa="191090997880",
+                        installation_number="5002533828"  # Same as poc_number
+                    )
+                    if index_data.get('error'):
+                        print(f"❌ get_index_data failed for {division}: {index_data.get('reason', 'Unknown error')}")
+                    else:
+                        print(f"✅ get_index_data successful for {division}!")
+                        print(f"📊 Index data keys: {list(index_data.keys())}")
+                        print(f"📄 Index data: {json.dumps(index_data, indent=2)}")
+                        break
+                except Exception as e:
+                    print(f"❌ get_index_data error for {division}: {e}")
 
         else:
             print("❌ Authentication failed!")

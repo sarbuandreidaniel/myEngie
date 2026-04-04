@@ -98,7 +98,7 @@ class MyEngieGasIndexSensor(CoordinatorEntity, SensorEntity):
         """Return the state."""
         if self.coordinator.data:
             index = self.coordinator.data.get("gas_index", 0)
-            return int(index) if index else None
+            return int(index)
         return None
 
     @property
