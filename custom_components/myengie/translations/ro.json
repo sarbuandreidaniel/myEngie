@@ -17,10 +17,6 @@
       "account_locked": "Contul este temporar blocat din cauza prea multor încercări eșuate de autentificare. Vă rugăm să încercați mai târziu.",
       "cannot_connect": "Conectarea la serviciile MyEngie a eșuat",
       "unknown": "A apărut o eroare neașteptată"
-    },
-    "abort": {
-      "already_configured": "MyEngie este deja configurat",
-      "already_in_progress": "Configurarea este deja în curs"
     }
   }
 }
