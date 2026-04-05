@@ -22,36 +22,5 @@
       "already_configured": "MyEngie este deja configurat",
       "already_in_progress": "Configurarea este deja în curs"
     }
-  },
-  "entity": {
-    "sensor": {
-      "balance": {
-        "name": "Sold"
-      },
-      "gas_index": {
-        "name": "Index Gaz"
-      },
-      "notifications": {
-        "name": "Notificări necitite"
-      },
-      "consumption_details": {
-        "name": "Detalii consum"
-      },
-      "account_status": {
-        "name": "Status cont"
-      },
-      "invoice_count": {
-        "name": "Număr facturi"
-      },
-      "pending_payments": {
-        "name": "Plăți în așteptare"
-      },
-      "latest_invoice": {
-        "name": "Ultima factură"
-      },
-      "invoice_history": {
-        "name": "Istoric facturi"
-      }
-    }
   }
 }
