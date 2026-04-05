@@ -1,6 +1,8 @@
 """Sensor platform for MyEngie integration."""
 
+import calendar
 import logging
+from datetime import datetime
 from homeassistant.components.sensor import (
     SensorEntity,
     SensorDeviceClass,
@@ -39,7 +41,8 @@ async def async_setup_entry(
         
         # Invoice history and details
         MyEngieLatestInvoiceSensor(coordinator, config_entry),
-        MyEngieInvoiceHistoryDetailsSensor(coordinator, config_entry),
+        MyEngieInvoiceHistoryYearSensor(coordinator, config_entry, datetime.now().year),
+        MyEngieInvoiceHistoryYearSensor(coordinator, config_entry, datetime.now().year - 1),
     ]
 
     async_add_entities(entities)
@@ -420,76 +423,84 @@ class MyEngieLatestInvoiceSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class MyEngieInvoiceHistoryDetailsSensor(CoordinatorEntity, SensorEntity):
-    """Sensor for invoice history details."""
+class MyEngieInvoiceHistoryYearSensor(CoordinatorEntity, SensorEntity):
+    """Sensor for invoice history for a specific year."""
 
-    _attr_name = "MyEngie Invoice History"
     _attr_icon = "mdi:file-document-multiple"
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_native_unit_of_measurement = "RON"
 
-    def __init__(self, coordinator, config_entry):
+    def __init__(self, coordinator, config_entry, year: int):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.config_entry = config_entry
+        self._year = year
+        self._attr_name = f"MyEngie Invoice History {year}"
         self._attr_unique_id = (
-            f"{DOMAIN}_{config_entry.entry_id}_invoice_history"
+            f"{DOMAIN}_{config_entry.entry_id}_invoice_history_{year}"
         )
+
+    def _get_year_invoices(self):
+        """Return invoices filtered for this sensor's year."""
+        if not self.coordinator.data:
+            return []
+        history = self.coordinator.data.get("invoice_history", [])
+        return [
+            inv for inv in history
+            if str(inv.get("invoiced_at", ""))[:4] == str(self._year)
+        ]
 
     @property
     def native_value(self):
-        """Return summary of invoice history."""
-        if self.coordinator.data:
-            history = self.coordinator.data.get("invoice_history", [])
-            if history:
-                try:
-                    total = sum(
-                        float(str(inv.get("total", 0)).replace(",", "."))
-                        for inv in history
-                        if inv.get("total")
-                    )
-                    average = total / len(history)
-                    return f"{average:.2f} RON (avg)"
-                except (ValueError, TypeError):
-                    return f"{len(history)} invoices"
-            return "No invoices"
-        return None
+        """Return total amount paid for the year."""
+        invoices = self._get_year_invoices()
+        if not invoices:
+            return None
+        try:
+            total = sum(
+                float(str(inv.get("total", 0)).replace(",", "."))
+                for inv in invoices
+                if inv.get("total")
+            )
+            return round(total, 2)
+        except (ValueError, TypeError):
+            return None
 
     @property
     def extra_state_attributes(self):
-        """Return invoice history details."""
-        if not self.coordinator.data:
-            return {}
-
-        history = self.coordinator.data.get("invoice_history", [])
-        if history:
-            try:
-                total_amount = sum(
-                    float(str(inv.get("total", 0)).replace(",", "."))
-                    for inv in history
-                    if inv.get("total")
-                )
-                average_amount = total_amount / len(history)
-            except (ValueError, TypeError):
-                total_amount = 0
-                average_amount = 0
-
+        """Return per-invoice attributes and yearly summary."""
+        invoices = self._get_year_invoices()
+        if not invoices:
             return {
-                "invoice_count": len(history),
-                "total_amount": f"{total_amount:.2f}",
-                "average_amount": f"{average_amount:.2f}",
-                "invoices": [
-                    {
-                        "invoice_number": inv.get("invoice_number"),
-                        "date": inv.get("invoiced_at"),
-                        "due_date": inv.get("due_date"),
-                        "amount": inv.get("total"),
-                        "paid": inv.get("unpaid", 0) == 0,
-                        "division": inv.get("division"),
-                        "download_url": inv.get("download_url"),
-                    }
-                    for inv in history[:10]
-                ]
+                "total_invoices": 0,
+                "total_amount_paid": 0.0,
+                "average_monthly_amount": 0.0,
+                "average_daily_amount": 0.0,
             }
-        return {"invoice_count": 0}
+
+        attributes = {}
+        total_amount = 0.0
+
+        for idx, inv in enumerate(invoices, 1):
+            date_str = inv.get("invoiced_at", "unknown")
+            try:
+                amount = round(float(str(inv.get("total", 0)).replace(",", ".")), 2)
+            except (ValueError, TypeError):
+                amount = 0.0
+            total_amount += amount
+            attributes[f"Invoice {idx} {date_str}"] = amount
+
+        invoice_count = len(invoices)
+        days_in_year = 366 if calendar.isleap(self._year) else 365
+
+        attributes["total_invoices"] = invoice_count
+        attributes["total_amount_paid"] = round(total_amount, 2)
+        attributes["average_monthly_amount"] = (
+            round(total_amount / invoice_count, 2) if invoice_count else 0.0
+        )
+        attributes["average_daily_amount"] = round(total_amount / days_in_year, 2)
+
+        return attributes
 
     @property
     def device_info(self):
