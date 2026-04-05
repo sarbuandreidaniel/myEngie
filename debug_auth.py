@@ -85,17 +85,49 @@ class MyEngieAPI:
         """Get user invitations."""
         return await self._request("GET", f"{API_BASE_URL}/v1/invitations")
 
-    async def get_index_data(self, poc_number, division, pa, installation_number):
-        """Get gas/electricity index data."""
+    async def get_unread_notifications(self):
+        """Get unread notifications count."""
+        return await self._request("GET", f"{API_BASE_URL}/v1/notifications/unread-number")
+
+    async def get_notifications_banner(self, poc_number, pa):
+        """Get notification banner."""
+        params = {"pa": pa, "account_class": "CS"}
+        return await self._request(
+            "GET",
+            f"{API_BASE_URL}/v1/notifications/banner/{poc_number}",
+            params=params,
+        )
+
+    async def get_index_data(self, poc_number, division, pa, installation_number=None):
+        """Get gas/electricity index data. installation_number is optional."""
         params = {
             "poc_number": poc_number,
             "division": division,
             "pa": pa,
-            "installation_number": installation_number,
         }
+        if installation_number:
+            params["installation_number"] = installation_number
         return await self._request(
             "GET",
             f"{API_BASE_URL}/v1/index/{poc_number}",
+            params=params,
+        )
+
+    async def get_index_consumption(self, poc_number, pa, start_date, end_date):
+        """Get gas consumption history by month."""
+        params = {"startDate": start_date, "endDate": end_date, "pa": pa}
+        return await self._request(
+            "GET",
+            f"{API_BASE_URL}/v1/index/consumption/{poc_number}",
+            params=params,
+        )
+
+    async def get_index_prognosis(self, poc_number, pa, installation_number):
+        """Get gas consumption prognosis by month."""
+        params = {"installation_number": installation_number, "pa": pa}
+        return await self._request(
+            "GET",
+            f"{API_BASE_URL}/v1/index/prognosis/{poc_number}",
             params=params,
         )
 
@@ -257,7 +289,16 @@ async def test_auth():
 
             api = MyEngieAPI(session, auth_manager)
 
-            # Test get_app_status first
+            # Extracted account fields (populated as we go)
+            contract_accounts = []
+            poc_number = None
+            pa = None
+            installation_number = None
+            account_id = None
+
+            # ----------------------------------------------------------------
+            # 1. get_app_status
+            # ----------------------------------------------------------------
             print("\n📡 Testing get_app_status()...")
             try:
                 status_data = await api.get_app_status()
@@ -265,12 +306,14 @@ async def test_auth():
                     print(f"❌ get_app_status failed: {status_data}")
                 else:
                     print("✅ get_app_status successful!")
-                    print(f"📊 Status data keys: {list(status_data.keys())}")
-                    print(f"📄 Status data: {json.dumps(status_data, indent=2)}")
+                    print(f"📊 Keys: {list(status_data.keys())}")
+                    print(f"📄 Data: {json.dumps(status_data, indent=2)}")
             except Exception as e:
                 print(f"❌ get_app_status error: {e}")
 
-            # Test Auth0 userinfo
+            # ----------------------------------------------------------------
+            # 2. get_userinfo (Auth0)
+            # ----------------------------------------------------------------
             print("\n📡 Testing Auth0 userinfo...")
             try:
                 userinfo_data = await api.get_userinfo()
@@ -278,12 +321,63 @@ async def test_auth():
                     print(f"❌ userinfo failed: {userinfo_data}")
                 else:
                     print("✅ userinfo successful!")
-                    print(f"📊 Userinfo data keys: {list(userinfo_data.keys())}")
-                    print(f"📄 Userinfo data: {json.dumps(userinfo_data, indent=2)}")
+                    print(f"📊 Keys: {list(userinfo_data.keys())}")
+                    print(f"📄 Data: {json.dumps(userinfo_data, indent=2)}")
             except Exception as e:
                 print(f"❌ userinfo error: {e}")
 
-            # Test get_invitations
+            # ----------------------------------------------------------------
+            # 3. get_placesofconsumption  ← KEY endpoint for pa/poc/installation
+            # ----------------------------------------------------------------
+            print("\n📡 Testing get_placesofconsumption()...")
+            try:
+                poc_data = await api.get_placesofconsumption()
+                if poc_data.get('error'):
+                    print(f"❌ get_placesofconsumption failed: {poc_data}")
+                else:
+                    print("✅ get_placesofconsumption successful!")
+                    print(f"📊 Keys: {list(poc_data.keys())}")
+                    print(f"📄 Full response: {json.dumps(poc_data, indent=2)}")
+
+                    # Extract account fields from the response
+                    inner = poc_data.get("data") or poc_data
+                    places = None
+                    if isinstance(inner, dict):
+                        places = inner.get("places_of_consumption") or inner.get("placesOfConsumption")
+                    elif isinstance(inner, list):
+                        places = inner
+
+                    if places:
+                        for place in places:
+                            if isinstance(place, dict):
+                                if place.get("pa") and not pa:
+                                    pa = str(place["pa"])
+                                    print(f"   ✅ Extracted pa: {pa}")
+                                if place.get("poc_number") and not poc_number:
+                                    poc_number = str(place["poc_number"])
+                                    print(f"   ✅ Extracted poc_number: {poc_number}")
+                                if place.get("installation_number") and not installation_number:
+                                    installation_number = str(place["installation_number"])
+                                    print(f"   ✅ Extracted installation_number: {installation_number}")
+                                for contract in place.get("cont_contract", []):
+                                    if isinstance(contract, dict):
+                                        num = contract.get("contract_account_number")
+                                        if num and str(num) not in contract_accounts:
+                                            contract_accounts.append(str(num))
+                                            print(f"   ✅ Extracted contract_account_number: {num}")
+                    else:
+                        print("   ⚠️  No places_of_consumption list found in response")
+            except Exception as e:
+                print(f"❌ get_placesofconsumption error: {e}")
+
+            if not contract_accounts:
+                print("\n⚠️  No contract accounts extracted from placesofconsumption")
+
+            print(f"\n📋 Extracted so far: contract_accounts={contract_accounts}, pa={pa}, poc_number={poc_number}, installation_number={installation_number}")
+
+            # ----------------------------------------------------------------
+            # 4. get_invitations
+            # ----------------------------------------------------------------
             print("\n📡 Testing get_invitations()...")
             try:
                 invitations_data = await api.get_invitations()
@@ -291,59 +385,174 @@ async def test_auth():
                     print(f"❌ get_invitations failed: {invitations_data}")
                 else:
                     print("✅ get_invitations successful!")
-                    print(f"📊 Invitations data keys: {list(invitations_data.keys())}")
-                    print(f"📄 Invitations data: {json.dumps(invitations_data, indent=2)}")
+                    print(f"📊 Keys: {list(invitations_data.keys())}")
+                    print(f"📄 Data: {json.dumps(invitations_data, indent=2)}")
             except Exception as e:
                 print(f"❌ get_invitations error: {e}")
 
-            # Test get_balance_details
+            # ----------------------------------------------------------------
+            # 5. get_unread_notifications
+            # ----------------------------------------------------------------
+            print("\n📡 Testing get_unread_notifications()...")
+            try:
+                notif_data = await api.get_unread_notifications()
+                if notif_data.get('error'):
+                    print(f"❌ get_unread_notifications failed: {notif_data}")
+                else:
+                    print("✅ get_unread_notifications successful!")
+                    print(f"📄 Data: {json.dumps(notif_data, indent=2)}")
+            except Exception as e:
+                print(f"❌ get_unread_notifications error: {e}")
+
+            # ----------------------------------------------------------------
+            # 6. get_balance_details  (needs contract_accounts)
+            # ----------------------------------------------------------------
             print("\n📡 Testing get_balance_details()...")
-            try:
-                contract_accounts = ["2103540725"]  # From placesofconsumption data
-                balance_details_data = await api.get_balance_details(contract_accounts)
-                if balance_details_data.get('error'):
-                    print(f"❌ get_balance_details failed: {balance_details_data}")
-                else:
-                    print("✅ get_balance_details successful!")
-                    print(f"📊 Balance details data keys: {list(balance_details_data.keys())}")
-                    print(f"📄 Balance details data: {json.dumps(balance_details_data, indent=2)}")
-            except Exception as e:
-                print(f"❌ get_balance_details error: {e}")
-
-            # Test get_balance_widget
-            print("\n📡 Testing get_balance_widget()...")
-            try:
-                balance_widget_data = await api.get_balance_widget(contract_accounts)
-                if balance_widget_data.get('error'):
-                    print(f"❌ get_balance_widget failed: {balance_widget_data}")
-                else:
-                    print("✅ get_balance_widget successful!")
-                    print(f"📊 Balance widget data keys: {list(balance_widget_data.keys())}")
-                    print(f"📄 Balance widget data: {json.dumps(balance_widget_data, indent=2)}")
-            except Exception as e:
-                print(f"❌ get_balance_widget error: {e}")
-
-            # Test get_index_data (if we have the required params)
-            print("\n📡 Testing get_index_data()...")
-            divisions = ["gaz", "GAZ", "electric", "ELECTRIC", "electricitate"]
-            for division in divisions:
+            if contract_accounts:
                 try:
-                    print(f"Trying division: {division}")
+                    balance_details_data = await api.get_balance_details(contract_accounts)
+                    if balance_details_data.get('error'):
+                        print(f"❌ get_balance_details failed: {balance_details_data}")
+                    else:
+                        print("✅ get_balance_details successful!")
+                        print(f"📊 Keys: {list(balance_details_data.keys())}")
+                        print(f"📄 Data: {json.dumps(balance_details_data, indent=2)}")
+                        # Try to grab account_id from the response
+                        inner = (balance_details_data.get("data") or {})
+                        if isinstance(inner, dict) and inner.get("account_id") and not account_id:
+                            account_id = str(inner["account_id"])
+                            print(f"   ✅ Extracted account_id: {account_id}")
+                except Exception as e:
+                    print(f"❌ get_balance_details error: {e}")
+            else:
+                print("⚠️  Skipped - no contract_accounts available")
+
+            # ----------------------------------------------------------------
+            # 7. get_balance_widget  (needs contract_accounts)
+            # ----------------------------------------------------------------
+            print("\n📡 Testing get_balance_widget()...")
+            if contract_accounts:
+                try:
+                    balance_widget_data = await api.get_balance_widget(contract_accounts)
+                    if balance_widget_data.get('error'):
+                        print(f"❌ get_balance_widget failed: {balance_widget_data}")
+                    else:
+                        print("✅ get_balance_widget successful!")
+                        print(f"📊 Keys: {list(balance_widget_data.keys())}")
+                        print(f"📄 Data: {json.dumps(balance_widget_data, indent=2)}")
+                except Exception as e:
+                    print(f"❌ get_balance_widget error: {e}")
+            else:
+                print("⚠️  Skipped - no contract_accounts available")
+
+            # ----------------------------------------------------------------
+            # 8. get_notifications_banner  (needs poc_number and pa)
+            # ----------------------------------------------------------------
+            print("\n📡 Testing get_notifications_banner()...")
+            _poc_for_banner = poc_number
+            if _poc_for_banner and pa:
+                try:
+                    banner_data = await api.get_notifications_banner(
+                        poc_number=_poc_for_banner,
+                        pa=pa,
+                    )
+                    if banner_data.get('error'):
+                        print(f"❌ get_notifications_banner failed: {banner_data}")
+                    else:
+                        print("✅ get_notifications_banner successful!")
+                        print(f"📄 Data: {json.dumps(banner_data, indent=2)}")
+                except Exception as e:
+                    print(f"❌ get_notifications_banner error: {e}")
+            else:
+                    print(f"⚠️  Skipped - missing poc_number ({_poc_for_banner}) or pa ({pa})")
+
+            # ----------------------------------------------------------------
+            # 9. get_index_data  (installation_number is optional - discovered from response)
+            # ----------------------------------------------------------------
+            print("\n📡 Testing get_index_data()...")
+            _poc = poc_number
+            _pa = pa
+            if _poc and _pa:
+                try:
                     index_data = await api.get_index_data(
-                        poc_number="5002533828",
-                        division=division,
-                        pa="191090997880",
-                        installation_number="5002533828"  # Same as poc_number
+                        poc_number=_poc,
+                        division="gaz",
+                        pa=_pa,
+                        # No installation_number - let the API return it
                     )
                     if index_data.get('error'):
-                        print(f"❌ get_index_data failed for {division}: {index_data.get('reason', 'Unknown error')}")
+                        print(f"❌ get_index_data failed: {index_data}")
                     else:
-                        print(f"✅ get_index_data successful for {division}!")
-                        print(f"📊 Index data keys: {list(index_data.keys())}")
-                        print(f"📄 Index data: {json.dumps(index_data, indent=2)}")
-                        break
+                        print("✅ get_index_data successful!")
+                        print(f"📄 Data: {json.dumps(index_data, indent=2)}")
+                        # Extract installation_number from response
+                        inst_data = index_data.get("data", [])
+                        if inst_data:
+                            insts = inst_data[0].get("installations", [])
+                            if insts:
+                                discovered_inst = str(insts[0].get("installation_number", ""))
+                                if discovered_inst and not installation_number:
+                                    installation_number = discovered_inst
+                                    print(f"   ✅ Discovered installation_number: {installation_number}")
                 except Exception as e:
-                    print(f"❌ get_index_data error for {division}: {e}")
+                    print(f"❌ get_index_data error: {e}")
+            else:
+                print(f"⚠️  Skipped - missing poc_number ({_poc}) or pa ({_pa})")
+
+            # ----------------------------------------------------------------
+            # 10. get_index_consumption  (needs poc_number, pa)
+            # ----------------------------------------------------------------
+            print("\n📡 Testing get_index_consumption()...")
+            if _poc and _pa:
+                from datetime import date, timedelta
+                today = date.today().isoformat()
+                one_year_ago = (date.today() - timedelta(days=365)).isoformat()
+                try:
+                    cons_data = await api.get_index_consumption(
+                        poc_number=_poc, pa=_pa,
+                        start_date=one_year_ago, end_date=today,
+                    )
+                    if cons_data.get('error'):
+                        print(f"❌ get_index_consumption failed: {cons_data}")
+                    else:
+                        print("✅ get_index_consumption successful!")
+                        print(f"📄 Data: {json.dumps(cons_data, indent=2)}")
+                except Exception as e:
+                    print(f"❌ get_index_consumption error: {e}")
+            else:
+                print(f"⚠️  Skipped - missing poc_number or pa")
+
+            # ----------------------------------------------------------------
+            # 11. get_index_prognosis  (needs poc_number, pa, installation_number)
+            # ----------------------------------------------------------------
+            print("\n📡 Testing get_index_prognosis()...")
+            if _poc and _pa and installation_number:
+                try:
+                    prog_data = await api.get_index_prognosis(
+                        poc_number=_poc, pa=_pa,
+                        installation_number=installation_number,
+                    )
+                    if prog_data.get('error'):
+                        print(f"❌ get_index_prognosis failed: {prog_data}")
+                    else:
+                        print("✅ get_index_prognosis successful!")
+                        print(f"📄 Data: {json.dumps(prog_data, indent=2)}")
+                except Exception as e:
+                    print(f"❌ get_index_prognosis error: {e}")
+            else:
+                print(f"⚠️  Skipped - missing poc_number ({_poc}), pa ({_pa}), or installation_number ({installation_number})")
+
+            # ----------------------------------------------------------------
+            # Summary
+            # ----------------------------------------------------------------
+            print("\n" + "=" * 40)
+            print("📋 SUMMARY OF EXTRACTED ACCOUNT FIELDS")
+            print("=" * 40)
+            print(f"  contract_accounts   : {contract_accounts}")
+            print(f"  account_id          : {account_id}")
+            print(f"  pa                  : {pa}")
+            print(f"  poc_number          : {poc_number}")
+            print(f"  installation_number : {installation_number}")
 
         else:
             print("❌ Authentication failed!")

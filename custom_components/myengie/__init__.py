@@ -1,7 +1,7 @@
 """Custom integration for MyEngie Romania."""
 
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
 import aiohttp
 
 from homeassistant.config_entries import ConfigEntry
@@ -90,9 +90,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
         self.session: aiohttp.ClientSession | None = None
         self.auth_manager: Auth0Manager | None = None
         self.api: MyEngieAPI | None = None
-        self._account_data = {}
         self.contract_accounts: list[str] = []
-        self.account_id: str = ""
         self.provider_account_id: str = ""
         self.poc_number: str = ""
         self.installation_number: str = ""
@@ -125,87 +123,32 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Authentication error: %s", err)
             return False
 
-    def _extract_account_info(self, raw_data: dict | list | None) -> None:
-        """Extract account identifiers from API responses."""
-        if raw_data is None:
+    def _extract_places_of_consumption(self, data: dict | None) -> None:
+        """Extract account identifiers from placesofconsumption response data.
+
+        Authoritative source for: pa (provider_account_id), poc_number,
+        and contract_account_numbers. All come exclusively from this endpoint.
+        """
+        if not isinstance(data, dict):
             return
-
-        def search(value: object) -> None:
-            if isinstance(value, dict):
-                for key, item in value.items():
-                    lower_key = key.lower()
-
-                    # Handle places_of_consumption specific structure
-                    if lower_key == "places_of_consumption" and isinstance(item, list):
-                        for place in item:
-                            if isinstance(place, dict):
-                                # Extract pa (provider account)
-                                if "pa" in place and place["pa"] and not self.provider_account_id:
-                                    self.provider_account_id = str(place["pa"])
-                                    _LOGGER.debug("Extracted provider_account_id (pa): %s from places_of_consumption", self.provider_account_id)
-
-                                # Extract poc_number
-                                if "poc_number" in place and place["poc_number"] and not self.poc_number:
-                                    self.poc_number = str(place["poc_number"])
-                                    _LOGGER.debug("Extracted poc_number: %s from places_of_consumption", self.poc_number)
-
-                                # Extract contract accounts from cont_contract
-                                if "cont_contract" in place and isinstance(place["cont_contract"], list):
-                                    for contract in place["cont_contract"]:
-                                        if isinstance(contract, dict) and "contract_account_number" in contract:
-                                            contract_num = str(contract["contract_account_number"])
-                                            if contract_num not in self.contract_accounts:
-                                                self.contract_accounts.append(contract_num)
-                                                _LOGGER.debug("Extracted contract_account_number: %s from places_of_consumption", contract_num)
-
-                    if lower_key in ("contract_account", "contract_account_id", "contractaccount", "contractAccount", "contract_accountid", "contractAccountId", "contract_account_number", "contractaccountnumber", "contractAccountNumber"):
-                        if isinstance(item, (list, tuple)):
-                            for x in item:
-                                if x and str(x) not in self.contract_accounts:
-                                    self.contract_accounts.append(str(x))
-                        elif item:
-                            item_str = str(item)
-                            if item_str not in self.contract_accounts:
-                                self.contract_accounts.append(item_str)
-                    elif lower_key in ("provider_account_id", "pa", "provider_id", "pa_number", "provider_number"):
-                        if item and not self.provider_account_id:
-                            self.provider_account_id = str(item)
-                            _LOGGER.debug("Extracted provider_account_id (pa): %s from key: %s", self.provider_account_id, key)
-                    elif lower_key in ("poc_number", "poc", "connection_point", "point_of_connection"):
-                        if item and not self.poc_number:
-                            self.poc_number = str(item)
-                            _LOGGER.debug("Extracted poc_number: %s from key: %s", self.poc_number, key)
-                    elif lower_key in ("installation_number", "installation_id", "installation"):
-                        if item and not self.installation_number:
-                            self.installation_number = str(item)
-                            _LOGGER.debug("Extracted installation_number: %s from key: %s", self.installation_number, key)
-                    elif lower_key in ("pod", "point_of_delivery", "point_of_dispatch"):
-                        if item and not self.pod:
-                            self.pod = str(item)
-                            _LOGGER.debug("Extracted pod: %s from key: %s", self.pod, key)
-                    elif lower_key in ("account_id", "id", "accountid", "accountId", "poc_number", "pocnumber", "pocNumber"):
-                        if item and str(item).isdigit():
-                            self.account_id = str(item)
-                            _LOGGER.debug("Extracted account_id: %s from key: %s", self.account_id, key)
-
-                    search(item)
-            elif isinstance(value, (list, tuple)):
-                for item in value:
-                    search(item)
-
-        search(raw_data)
-
-        # Use contract account as account_id if not already set
-        if not self.account_id and self.contract_accounts:
-            self.account_id = self.contract_accounts[0]
-            _LOGGER.debug("Set account_id from contract_accounts: %s", self.account_id)
-
-        # Fallback: if no contract accounts but have account_id, use account_id as contract account
-        if not self.contract_accounts and self.account_id:
-            self.contract_accounts = [self.account_id]
-            _LOGGER.debug("Set contract_accounts from account_id: %s", self.contract_accounts)
-
-        # Normalize unique accounts
+        places = data.get("places_of_consumption", [])
+        if not isinstance(places, list):
+            return
+        for place in places:
+            if not isinstance(place, dict):
+                continue
+            if place.get("pa") and not self.provider_account_id:
+                self.provider_account_id = str(place["pa"])
+                _LOGGER.debug("Extracted pa: %s", self.provider_account_id)
+            if place.get("poc_number") and not self.poc_number:
+                self.poc_number = str(place["poc_number"])
+                _LOGGER.debug("Extracted poc_number: %s", self.poc_number)
+            for contract in place.get("cont_contract", []):
+                if isinstance(contract, dict) and contract.get("contract_account_number"):
+                    num = str(contract["contract_account_number"])
+                    if num not in self.contract_accounts:
+                        self.contract_accounts.append(num)
+                        _LOGGER.debug("Extracted contract_account: %s", num)
         self.contract_accounts = list(dict.fromkeys(self.contract_accounts))
 
     async def _async_update_data(self) -> dict:
@@ -221,113 +164,117 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
 
             _LOGGER.debug("Fetching data from MyEngie API")
 
-            # Fetch app status first and extract account identifiers
+            # App status — check for maintenance or invalid token, no account data here
             status = await self.api.get_app_status()
-            
-            # Check if refresh token is invalid
             if status.get("reason") == "invalid_refresh_token":
                 _LOGGER.warning("Refresh token invalid, clearing auth and re-authenticating")
                 self._is_initialized = False
                 self.auth_manager = None
                 if not await self._async_authenticate():
                     raise UpdateFailed("Failed to re-authenticate after token invalidation")
-                # Retry the app status call
                 status = await self.api.get_app_status()
-            
             if status.get("error"):
                 _LOGGER.warning("App status check failed: %s", status)
-            self._extract_account_info(status.get("data"))
 
-            # If no contract accounts found in app status, try invitations
-            if not self.contract_accounts:
-                invitations = await self.api.get_invitations()
-                if not invitations.get("error"):
-                    self._extract_account_info(invitations.get("data"))
-                    _LOGGER.debug("Extracted account info from invitations")
+            # Places of consumption — authoritative source for pa, poc_number, contract_accounts
+            placesofconsumption = await self.api.get_placesofconsumption()
+            if not placesofconsumption.get("error"):
+                self._extract_places_of_consumption(placesofconsumption.get("data"))
+            else:
+                _LOGGER.warning("placesofconsumption failed: %s", placesofconsumption)
 
-            # If still no contract accounts, try placesofconsumption
-            if not self.contract_accounts:
-                placesofconsumption = await self.api.get_placesofconsumption()
-                if not placesofconsumption.get("error"):
-                    self._extract_account_info(placesofconsumption.get("data"))
-                    _LOGGER.debug("Extracted account info from placesofconsumption")
-            notifications = await self.api.get_unread_notifications()
+            # Notifications count
             notification_count = 0
+            notifications = await self.api.get_unread_notifications()
             if not notifications.get("error"):
                 try:
-                    notification_count = int(notifications.get("data", 0))
+                    notif_data = notifications.get("data", {})
+                    if isinstance(notif_data, dict):
+                        notification_count = int(notif_data.get("unreadMessages", 0))
+                    else:
+                        notification_count = int(notif_data)
                 except (ValueError, TypeError):
                     notification_count = 0
 
-            # Fetch balance and invoices when contract accounts are available
-            balance_details = {"error": True}
+            # Balance and invoices
             total_balance = "0.00"
             invoices = []
             pending = []
             if self.contract_accounts:
                 balance_details = await self.api.get_balance_details(self.contract_accounts)
                 if not balance_details.get("error"):
-                    data = balance_details.get("data", {})
-                    # Extract account info from balance details response
-                    self._extract_account_info(balance_details.get("data"))
-                    total_balance = data.get("total", "0.00")
-                    invoices = data.get("invoices", [])
-                    pending = data.get("pending", [])
+                    bd = balance_details.get("data", {})
+                    total_balance = bd.get("total", "0.00")
+                    invoices = bd.get("invoices", [])
+                    pending = bd.get("pending", [])
             else:
-                _LOGGER.warning("No contract accounts available, skipping balance and invoice fetch")
+                _LOGGER.warning("No contract accounts found, skipping balance fetch")
 
-            # Fetch index data (gas consumption) if parameters are available
+            # Index data — installation_number and pod are discovered from the response
             gas_index = None
             next_read_dates = None
             index_history = []
-            if self.poc_number and self.provider_account_id and self.installation_number:
+            if self.poc_number and self.provider_account_id:
                 try:
                     index_data = await self.api.get_index_data(
                         poc_number=self.poc_number,
                         division="gaz",
                         pa=self.provider_account_id,
-                        installation_number=self.installation_number,
+                        installation_number=self.installation_number or None,
                     )
                     if not index_data.get("error"):
-                        installations = index_data.get("data", [])
-                        if installations:
-                            first_inst = installations[0].get("installations", [])
+                        installations_data = index_data.get("data", [])
+                        if installations_data:
+                            first_inst = installations_data[0].get("installations", [])
                             if first_inst:
-                                gas_index = first_inst[0].get("last_index", 0)
-                                next_read_dates = first_inst[0].get("next_read_dates")
+                                inst = first_inst[0]
+                                if inst.get("installation_number") and not self.installation_number:
+                                    self.installation_number = str(inst["installation_number"])
+                                    _LOGGER.debug("Discovered installation_number: %s", self.installation_number)
+                                if inst.get("pod") and not self.pod:
+                                    self.pod = str(inst["pod"])
+                                    _LOGGER.debug("Discovered pod: %s", self.pod)
+                                gas_index = inst.get("last_index", 0)
+                                next_read_dates = inst.get("next_read_dates")
+                    else:
+                        _LOGGER.warning("Index data fetch failed: %s", index_data)
                 except Exception as err:
                     _LOGGER.debug("Could not fetch index data: %s", err)
+
+                # Consumption history (12 months)
+                try:
+                    end_date = date.today().isoformat()
+                    start_date = (date.today() - timedelta(days=365)).isoformat()
+                    consumption = await self.api.get_index_consumption(
+                        poc_number=self.poc_number,
+                        pa=self.provider_account_id,
+                        start_date=start_date,
+                        end_date=end_date,
+                    )
+                    if not consumption.get("error"):
+                        index_history = consumption.get("data", [])
+                except Exception as err:
+                    _LOGGER.debug("Could not fetch consumption history: %s", err)
             else:
                 _LOGGER.warning(
-                    "Index fetch skipped because POC/PA/installation data are missing: poc=%s pa=%s installation=%s",
+                    "Index fetch skipped - missing poc=%s or pa=%s",
                     self.poc_number,
                     self.provider_account_id,
-                    self.installation_number,
                 )
 
-            # Fetch balance widget only with contract accounts
-            balance_widget = {"error": True}
+            # Balance widget
             balance_details_data = {}
             if self.contract_accounts:
                 balance_widget = await self.api.get_balance_widget(self.contract_accounts)
                 if not balance_widget.get("error"):
                     balance_details_data = balance_widget.get("data", {})
-                    # Extract account info from balance widget response
-                    self._extract_account_info(balance_widget.get("data"))
-            else:
-                _LOGGER.warning("No contract accounts available, skipping balance widget fetch")
 
-            # Fallback: if poc_number exists but installation_number doesn't, use poc_number as installation_number
-            if self.poc_number and not self.installation_number:
-                self.installation_number = self.poc_number
-                _LOGGER.debug("Set installation_number from poc_number: %s", self.installation_number)
-
-            # Get notifications banner if account ID and PA available
+            # Notifications banner
             banners = []
-            if self.account_id and self.provider_account_id:
+            if self.poc_number and self.provider_account_id:
                 try:
                     banner_data = await self.api.get_notifications_banner(
-                        account_id=self.account_id,
+                        poc_number=self.poc_number,
                         pa=self.provider_account_id,
                     )
                     if not banner_data.get("error"):
@@ -336,14 +283,9 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                     _LOGGER.debug("Could not fetch banners: %s", err)
             else:
                 _LOGGER.warning(
-                    "Banner fetch skipped - missing required fields. account_id=%s, pa=%s. "
-                    "Extracted data: contract_accounts=%s, poc=%s, installation=%s, pod=%s",
-                    self.account_id,
-                    self.provider_account_id,
-                    self.contract_accounts,
+                    "Banner fetch skipped - missing poc=%s or pa=%s",
                     self.poc_number,
-                    self.installation_number,
-                    self.pod,
+                    self.provider_account_id,
                 )
 
             # Compile data

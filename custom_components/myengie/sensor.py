@@ -83,7 +83,7 @@ class MyEngieGasIndexSensor(CoordinatorEntity, SensorEntity):
 
     _attr_name = "MyEngie Gas Index"
     _attr_icon = "mdi:gauge"
-    _attr_unit_of_measurement = "kWh"
+    _attr_native_unit_of_measurement = "m³"
 
     def __init__(self, coordinator, config_entry):
         """Initialize the sensor."""
@@ -128,7 +128,6 @@ class MyEngieNotificationsSensor(CoordinatorEntity, SensorEntity):
 
     _attr_name = "MyEngie Unread Notifications"
     _attr_icon = "mdi:bell"
-    _attr_device_class = SensorDeviceClass.ENUM
 
     def __init__(self, coordinator, config_entry):
         """Initialize the sensor."""
@@ -199,6 +198,11 @@ class MyEngieConsumptionDetailsSensor(CoordinatorEntity, SensorEntity):
         if next_read:
             attributes["next_read_start"] = next_read.get("startDate")
             attributes["next_read_end"] = next_read.get("endDate")
+
+        # Add consumption history if available
+        index_history = data.get("index_history", [])
+        if index_history:
+            attributes["consumption_history"] = index_history
 
         return attributes
 
@@ -300,7 +304,7 @@ class MyEngiePendingPaymentsSensor(CoordinatorEntity, SensorEntity):
 
     _attr_name = "MyEngie Pending Payments"
     _attr_icon = "mdi:alert-circle"
-    _attr_unit_of_measurement = "RON"
+    _attr_native_unit_of_measurement = "RON"
 
     def __init__(self, coordinator, config_entry):
         """Initialize the sensor."""

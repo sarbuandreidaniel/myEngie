@@ -1,7 +1,6 @@
 """API client for MyEngie Romania."""
 
 import aiohttp
-import json
 import logging
 from typing import Any, Dict, Optional
 from .auth import Auth0Manager
@@ -9,7 +8,6 @@ from .auth import Auth0Manager
 _LOGGER = logging.getLogger(__name__)
 
 API_BASE_URL = "https://gwss.engie.ro/myservices"
-AUTH_BASE_URL = "https://auth.engie.ro"
 
 
 class MyEngieAPI:
@@ -49,15 +47,16 @@ class MyEngieAPI:
         poc_number: str,
         division: str,
         pa: str,
-        installation_number: str,
+        installation_number: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Get gas/electricity index data."""
-        params = {
+        params: Dict[str, str] = {
             "poc_number": poc_number,
             "division": division,
             "pa": pa,
-            "installation_number": installation_number,
         }
+        if installation_number:
+            params["installation_number"] = installation_number
         return await self._request(
             "GET",
             f"{API_BASE_URL}/v1/index/{poc_number}",
@@ -79,19 +78,55 @@ class MyEngieAPI:
         )
 
     async def get_notifications_banner(
-        self, account_id: str, pa: str
+        self, poc_number: str, pa: str
     ) -> Dict[str, Any]:
         """Get notification banner."""
         params = {"pa": pa, "account_class": "CS"}
         return await self._request(
             "GET",
-            f"{API_BASE_URL}/v1/notifications/banner/{account_id}",
+            f"{API_BASE_URL}/v1/notifications/banner/{poc_number}",
             params=params,
         )
 
     async def get_invitations(self) -> Dict[str, Any]:
         """Get user invitations."""
         return await self._request("GET", f"{API_BASE_URL}/v1/invitations")
+
+    async def get_index_consumption(
+        self,
+        poc_number: str,
+        pa: str,
+        start_date: str,
+        end_date: str,
+    ) -> Dict[str, Any]:
+        """Get gas consumption history by month."""
+        params = {
+            "startDate": start_date,
+            "endDate": end_date,
+            "pa": pa,
+        }
+        return await self._request(
+            "GET",
+            f"{API_BASE_URL}/v1/index/consumption/{poc_number}",
+            params=params,
+        )
+
+    async def get_index_prognosis(
+        self,
+        poc_number: str,
+        pa: str,
+        installation_number: str,
+    ) -> Dict[str, Any]:
+        """Get gas consumption prognosis by month."""
+        params = {
+            "installation_number": installation_number,
+            "pa": pa,
+        }
+        return await self._request(
+            "GET",
+            f"{API_BASE_URL}/v1/index/prognosis/{poc_number}",
+            params=params,
+        )
 
     async def get_banners(self) -> Dict[str, Any]:
         """Get banners."""
@@ -107,6 +142,7 @@ class MyEngieAPI:
         url: str,
         params: Optional[Dict[str, str]] = None,
         data: Optional[aiohttp.FormData] = None,
+        _retrying: bool = False,
     ) -> Dict[str, Any]:
         """Make API request with automatic token refresh."""
         # Check if token needs refresh
@@ -140,19 +176,18 @@ class MyEngieAPI:
                 if response.status == 200:
                     return await response.json()
                 elif response.status in (400, 401):
-                    # Token may be expired or invalid, try refresh once
                     error_text = await response.text()
                     _LOGGER.debug("Auth error response: %s", error_text)
-                    
-                    # Check if refresh token is invalid
+
                     if "Token de refresh invalid" in error_text or "refresh_token" in error_text.lower():
                         _LOGGER.error("Refresh token is invalid - re-authentication required")
                         return {"error": True, "data": {}, "reason": "invalid_refresh_token"}
-                    
-                    _LOGGER.debug("Attempting token refresh due to auth response")
-                    if await self.auth_manager.refresh_access_token(self.session):
-                        # Retry request with new token
-                        return await self._request(method, url, params, data)
+
+                    # Only retry once to avoid infinite recursion
+                    if not _retrying:
+                        _LOGGER.debug("Attempting token refresh due to auth response")
+                        if await self.auth_manager.refresh_access_token(self.session):
+                            return await self._request(method, url, params, data, _retrying=True)
                     _LOGGER.error("Token refresh failed after auth failure")
                     return {"error": True, "data": {}, "reason": "token_refresh_failed"}
                 else:
