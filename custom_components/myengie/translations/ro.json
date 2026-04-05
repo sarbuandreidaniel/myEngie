@@ -26,10 +26,10 @@
   "entity": {
     "sensor": {
       "balance": {
-        "name": "Echilibru"
+        "name": "Sold"
       },
       "gas_index": {
-        "name": "Indicele de gaz"
+        "name": "Index gaz"
       },
       "notifications": {
         "name": "Notificări necitite"
@@ -38,10 +38,10 @@
         "name": "Detalii consum"
       },
       "account_status": {
-        "name": "Starea contului"
+        "name": "Status cont"
       },
       "invoice_count": {
-        "name": "Număr de facturi"
+        "name": "Număr facturi"
       },
       "pending_payments": {
         "name": "Plăți în așteptare"
@@ -50,7 +50,7 @@
         "name": "Ultima factură"
       },
       "invoice_history": {
-        "name": "Istoricul facturilor"
+        "name": "Istoric facturi"
       }
     }
   }

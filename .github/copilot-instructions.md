@@ -18,13 +18,8 @@ Stored in `.env` (git-ignored). The script loads them automatically via `python-
 
 ## Translations
 
-When adding a new key to `custom_components/myengie/translations/en.json`, **also add a matching entry** to `custom_components/myengie/translations/en.context.json`.
+Whenever a string is added or updated in `custom_components/myengie/translations/en.json`, **immediately translate the same key into every other language file** found in the `custom_components/myengie/translations/` directory (currently `ro.json`).
 
-The context entry should be a plain-English sentence describing what the string is used for (e.g. where it appears in the UI, what it communicates to the user). This improves machine translation quality for all other languages.
-
-### Example
-```json
-"entity.sensor.my_new_sensor.name": "Home Assistant sensor name showing the current value of X in unit Y"
-```
-
-If the context entry is missing, the translate workflow will still work but will print a warning.
+- Keep all translation files in sync with `en.json` — no key present in `en.json` should be missing from any other language file.
+- Use natural, idiomatic phrasing for each language rather than a word-for-word literal translation.
+- If a new language file is added to the folder in the future, apply the same rule to it automatically.
