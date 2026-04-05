@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'custom_components/myengie/translations/en.json'
+      - 'custom_components/myengie/translations/en.context.json'
 
 permissions:
   contents: write

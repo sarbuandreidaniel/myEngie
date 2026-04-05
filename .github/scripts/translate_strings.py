@@ -8,6 +8,7 @@ from deep_translator import GoogleTranslator
 
 TRANSLATIONS_DIR = Path("custom_components/myengie/translations")
 SOURCE_LANG = "en"
+CONTEXT_FILE = TRANSLATIONS_DIR / "en.context.json"
 
 LANG_MAP = {
     "ro": "ro",
@@ -61,7 +62,7 @@ def set_leaf(d: dict, dotted_key: str, value: str) -> None:
     d[keys[-1]] = value
 
 
-def translate_missing(source_flat: dict, target: dict, lang_code: str) -> tuple[dict, int]:
+def translate_missing(source_flat: dict, target: dict, lang_code: str, context: dict) -> tuple[dict, int]:
     """Find missing keys, translate them, and inject into target."""
     target_flat = flatten(target)
     missing = {k: v for k, v in source_flat.items() if k not in target_flat}
@@ -72,7 +73,16 @@ def translate_missing(source_flat: dict, target: dict, lang_code: str) -> tuple[
     count = 0
     for key, text in missing.items():
         try:
-            translated = translator.translate(text)
+            hint = context.get(key)
+            if hint:
+                # Prepend context on its own line so Google Translate uses it
+                # as guidance, then take everything after the first newline.
+                combined = f"[{hint}]\n{text}"
+                translated_combined = translator.translate(combined)
+                parts = translated_combined.split("\n", 1)
+                translated = parts[1].strip() if len(parts) > 1 else translated_combined
+            else:
+                translated = translator.translate(text)
             set_leaf(target, key, translated)
             print(f"  [{lang_code}] {key}: '{text}' -> '{translated}'")
             count += 1
@@ -82,17 +92,33 @@ def translate_missing(source_flat: dict, target: dict, lang_code: str) -> tuple[
     return target, count
 
 
+def check_context_coverage(source_flat: dict, context: dict) -> None:
+    """Warn about keys in en.json that have no entry in en.context.json."""
+    missing = [k for k in source_flat if k not in context]
+    if missing:
+        print("⚠️  Missing context hints (translations will be less accurate):")
+        for key in missing:
+            print(f"   {key}")
+
+
 def main() -> None:
     source_file = TRANSLATIONS_DIR / f"{SOURCE_LANG}.json"
     with open(source_file, encoding="utf-8") as f:
         source = json.load(f)
     source_flat = flatten(source)
 
+    context: dict = {}
+    if CONTEXT_FILE.exists():
+        with open(CONTEXT_FILE, encoding="utf-8") as f:
+            context = json.load(f)
+
+    check_context_coverage(source_flat, context)
+
     total_changed = 0
 
     for lang_file in sorted(TRANSLATIONS_DIR.glob("*.json")):
         lang_stem = lang_file.stem
-        if lang_stem == SOURCE_LANG:
+        if lang_stem in (SOURCE_LANG, "en.context"):
             continue
 
         lang_code = LANG_MAP.get(lang_stem, lang_stem)
@@ -100,7 +126,7 @@ def main() -> None:
         with open(lang_file, encoding="utf-8") as f:
             target = json.load(f)
 
-        target, count = translate_missing(source_flat, target, lang_code)
+        target, count = translate_missing(source_flat, target, lang_code, context)
 
         if count > 0:
             with open(lang_file, "w", encoding="utf-8") as f:

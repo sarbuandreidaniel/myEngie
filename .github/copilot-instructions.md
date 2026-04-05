@@ -13,3 +13,18 @@ Any new API endpoint added to `custom_components/myengie/api.py` **must** be tes
 
 ### Credentials
 Stored in `.env` (git-ignored). The script loads them automatically via `python-dotenv`.
+
+---
+
+## Translations
+
+When adding a new key to `custom_components/myengie/translations/en.json`, **also add a matching entry** to `custom_components/myengie/translations/en.context.json`.
+
+The context entry should be a plain-English sentence describing what the string is used for (e.g. where it appears in the UI, what it communicates to the user). This improves machine translation quality for all other languages.
+
+### Example
+```json
+"entity.sensor.my_new_sensor.name": "Home Assistant sensor name showing the current value of X in unit Y"
+```
+
+If the context entry is missing, the translate workflow will still work but will print a warning.
