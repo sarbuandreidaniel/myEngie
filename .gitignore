@@ -39,3 +39,7 @@ Thumbs.db
 # Misc
 .env
 .venv
+
+# Development only
+docs/
+debug_auth.py
