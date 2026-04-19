@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure MyEngie",
+        "description": "Enter your ENGIE Romania credentials",
+        "data": {
+          "username": "Email or Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "missing_username": "Username is required",
+      "missing_password": "Password is required",
+      "invalid_auth": "Invalid credentials. Please check your username and password.",
+      "account_locked": "Account temporarily locked due to too many failed login attempts. Please try again later.",
+      "cannot_connect": "Failed to connect to MyEngie services",
+      "unknown": "An unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "MyEngie is already configured",
+      "already_in_progress": "Configuration is already in progress"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "balance": {
+        "name": "Balance"
+      },
+      "gas_index": {
+        "name": "Gas Index"
+      },
+      "notifications": {
+        "name": "Unread Notifications"
+      },
+      "consumption_details": {
+        "name": "Consumption Details"
+      },
+      "account_status": {
+        "name": "Account Status"
+      },
+      "invoice_count": {
+        "name": "Invoice Count"
+      },
+      "pending_payments": {
+        "name": "Pending Payments"
+      },
+      "latest_invoice": {
+        "name": "Latest Invoice"
+      },
+      "invoice_history": {
+        "name": "Invoice History"
+      }
+    }
+  }
+}

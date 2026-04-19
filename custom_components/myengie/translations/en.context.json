@@ -1,0 +1,23 @@
+{
+  "config.step.user.title": "Title of the Home Assistant configuration flow setup page",
+  "config.step.user.description": "Help text shown on the login form in Home Assistant",
+  "config.step.user.data.username": "Label for the email/username input field",
+  "config.step.user.data.password": "Label for the password input field",
+  "config.error.missing_username": "Validation error shown when username field is empty",
+  "config.error.missing_password": "Validation error shown when password field is empty",
+  "config.error.invalid_auth": "Error shown when login credentials are wrong",
+  "config.error.account_locked": "Error shown when account is temporarily locked after too many failed logins",
+  "config.error.cannot_connect": "Error shown when the app cannot reach the ENGIE Romania servers",
+  "config.error.unknown": "Generic fallback error message",
+  "config.abort.already_configured": "Message shown when this integration is already set up in Home Assistant",
+  "config.abort.already_in_progress": "Message shown when the setup wizard is already open",
+  "entity.sensor.balance.name": "Home Assistant sensor name showing the current Romanian energy bill balance in RON",
+  "entity.sensor.gas_index.name": "Home Assistant sensor name showing the current gas meter reading in cubic meters",
+  "entity.sensor.notifications.name": "Home Assistant sensor name showing the number of unread notifications",
+  "entity.sensor.consumption_details.name": "Home Assistant sensor name for a summary of energy consumption details",
+  "entity.sensor.account_status.name": "Home Assistant sensor name showing whether the utility account is up to date or has pending payments",
+  "entity.sensor.invoice_count.name": "Home Assistant sensor name showing the total number of invoices",
+  "entity.sensor.pending_payments.name": "Home Assistant sensor name showing the total amount of unpaid invoices in RON",
+  "entity.sensor.latest_invoice.name": "Home Assistant sensor name showing the most recent invoice amount",
+  "entity.sensor.invoice_history.name": "Home Assistant sensor name showing the history of past invoices"
+}

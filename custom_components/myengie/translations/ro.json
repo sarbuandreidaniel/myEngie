@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurează MyEngie",
+        "description": "Introduceți datele de autentificare ENGIE România",
+        "data": {
+          "username": "Email sau nume de utilizator",
+          "password": "Parolă"
+        }
+      }
+    },
+    "error": {
+      "missing_username": "Numele de utilizator este obligatoriu",
+      "missing_password": "Parola este obligatorie",
+      "invalid_auth": "Date de autentificare incorecte. Verificați numele de utilizator și parola.",
+      "account_locked": "Contul este temporar blocat din cauza prea multor încercări eșuate de autentificare. Vă rugăm să încercați mai târziu.",
+      "cannot_connect": "Conectarea la serviciile MyEngie a eșuat",
+      "unknown": "A apărut o eroare neașteptată"
+    },
+    "abort": {
+      "already_configured": "MyEngie este deja configurat",
+      "already_in_progress": "Configurarea este deja în curs"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "balance": {
+        "name": "Sold"
+      },
+      "gas_index": {
+        "name": "Index gaz"
+      },
+      "notifications": {
+        "name": "Notificări necitite"
+      },
+      "consumption_details": {
+        "name": "Detalii consum"
+      },
+      "account_status": {
+        "name": "Status cont"
+      },
+      "invoice_count": {
+        "name": "Număr facturi"
+      },
+      "pending_payments": {
+        "name": "Plăți în așteptare"
+      },
+      "latest_invoice": {
+        "name": "Ultima factură"
+      },
+      "invoice_history": {
+        "name": "Istoric facturi"
+      }
+    }
+  }
+}

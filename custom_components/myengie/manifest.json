@@ -1,0 +1,15 @@
+{
+  "domain": "myengie",
+  "name": "MyEngie Romania",
+  "codeowners": [
+    "@sarbuandreidaniel"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/sarbuandreidaniel/ha-myEngie",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "requirements": [
+    "auth0-python>=1.0.0"
+  ],
+  "version": "0.6.1"
+}
