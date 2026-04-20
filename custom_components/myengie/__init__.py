@@ -2,6 +2,7 @@
 
 import logging
 from datetime import date, timedelta
+from typing import Any
 import aiohttp
 
 from homeassistant.config_entries import ConfigEntry
@@ -90,11 +91,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
         self.session: aiohttp.ClientSession | None = None
         self.auth_manager: Auth0Manager | None = None
         self.api: MyEngieAPI | None = None
-        self.contract_accounts: list[str] = []
-        self.provider_account_id: str = ""
-        self.poc_number: str = ""
-        self.installation_number: str = ""
-        self.pod: str = ""
+        self.places: dict[str, dict[str, Any]] = {}
         self._is_initialized = False
 
     async def _async_authenticate(self) -> bool:
@@ -126,30 +123,96 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
     def _extract_places_of_consumption(self, data: dict | None) -> None:
         """Extract account identifiers from placesofconsumption response data.
 
-        Authoritative source for: pa (provider_account_id), poc_number,
-        and contract_account_numbers. All come exclusively from this endpoint.
+        Authoritative source for: pa, poc_number, and contract_account_numbers.
         """
         if not isinstance(data, dict):
             return
+
         places = data.get("places_of_consumption", [])
         if not isinstance(places, list):
             return
+
+        existing_places = self.places
+        extracted_places: dict[str, dict[str, Any]] = {}
+
         for place in places:
             if not isinstance(place, dict):
                 continue
-            if place.get("pa") and not self.provider_account_id:
-                self.provider_account_id = str(place["pa"])
-                _LOGGER.debug("Extracted pa: %s", self.provider_account_id)
-            if place.get("poc_number") and not self.poc_number:
-                self.poc_number = str(place["poc_number"])
-                _LOGGER.debug("Extracted poc_number: %s", self.poc_number)
+
+            pa = str(place.get("pa", "")).strip()
+            poc_number = str(place.get("poc_number", "")).strip()
+            if not pa or not poc_number:
+                continue
+
+            place_key = f"{pa}_{poc_number}"
+            existing_place = existing_places.get(place_key, {})
+            contract_accounts: list[str] = []
+
             for contract in place.get("cont_contract", []):
                 if isinstance(contract, dict) and contract.get("contract_account_number"):
                     num = str(contract["contract_account_number"])
-                    if num not in self.contract_accounts:
-                        self.contract_accounts.append(num)
-                        _LOGGER.debug("Extracted contract_account: %s", num)
-        self.contract_accounts = list(dict.fromkeys(self.contract_accounts))
+                    if num not in contract_accounts:
+                        contract_accounts.append(num)
+
+            extracted_places[place_key] = {
+                "place_key": place_key,
+                "pa": pa,
+                "poc_number": poc_number,
+                "contract_accounts": contract_accounts,
+                "installation_number": existing_place.get("installation_number", ""),
+                "pod": existing_place.get("pod", ""),
+                "place_name": existing_place.get(
+                    "place_name", self._default_place_name(poc_number)
+                ),
+            }
+
+        self.places = extracted_places
+
+    @staticmethod
+    def _default_place_name(poc_number: str) -> str:
+        """Return a stable fallback name for a place."""
+        if poc_number:
+            return f"MyEngie {poc_number}"
+        return "MyEngie"
+
+    @staticmethod
+    def _parse_amount(value: Any) -> float:
+        """Normalize amount strings returned by the API."""
+        try:
+            return float(str(value).replace(",", "."))
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _apply_contract_aliases(self, contracts_data: Any) -> None:
+        """Apply contract aliases to known places when a safe mapping exists."""
+        if not isinstance(contracts_data, list) or not self.places:
+            return
+
+        aliases = []
+        for contract in contracts_data:
+            if not isinstance(contract, dict):
+                continue
+            alias = str(contract.get("alias", "")).strip()
+            if alias:
+                aliases.append(alias)
+
+        if not aliases:
+            return
+
+        if len(self.places) == 1:
+            next(iter(self.places.values()))["place_name"] = aliases[0]
+            return
+
+        if len(aliases) != len(self.places):
+            _LOGGER.debug(
+                "Could not map contract aliases to places: aliases=%s places=%s",
+                len(aliases),
+                len(self.places),
+            )
+            return
+
+        for place, alias in zip(self.places.values(), aliases):
+            place["place_name"] = alias
 
     async def _async_update_data(self) -> dict:
         """Fetch data from MyEngie API."""
@@ -184,183 +247,185 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning("placesofconsumption failed: %s", placesofconsumption)
 
             # Contracts — source for user-defined place alias/name
-            place_name = "MyEngie"
             contracts = await self.api.get_contracts()
             if not contracts.get("error"):
-                contracts_data = contracts.get("data", [])
-                if isinstance(contracts_data, list) and contracts_data:
-                    alias = contracts_data[0].get("alias", "")
-                    if alias and alias.strip():
-                        place_name = alias.strip()
+                self._apply_contract_aliases(contracts.get("data", []))
             else:
                 _LOGGER.warning("contracts fetch failed: %s", contracts)
 
-            # Notifications count
-            notification_count = 0
-            notifications = await self.api.get_unread_notifications()
-            if not notifications.get("error"):
-                try:
-                    notif_data = notifications.get("data", {})
-                    if isinstance(notif_data, dict):
-                        notification_count = int(notif_data.get("unreadMessages", 0))
-                    else:
-                        notification_count = int(notif_data)
-                except (ValueError, TypeError):
-                    notification_count = 0
+            today = date.today()
+            prev_year = today.year - 1
+            places_data: dict[str, dict[str, Any]] = {}
 
-            # Balance and invoices
-            total_balance = "0.00"
-            invoices = []
-            pending = []
-            invoice_history: list = []
-            invoice_history_current: list = []
-            if self.contract_accounts:
-                balance_details = await self.api.get_balance_details(self.contract_accounts)
-                if not balance_details.get("error"):
-                    bd = balance_details.get("data", {})
-                    total_balance = bd.get("total", "0.00")
-                    invoices = bd.get("invoices", [])
-                    pending = bd.get("pending", [])
-            else:
-                _LOGGER.warning("No contract accounts found, skipping balance fetch")
+            for place_key, place in self.places.items():
+                pa = place["pa"]
+                poc_number = place["poc_number"]
+                contract_accounts = place.get("contract_accounts", [])
 
-            # Invoice history — separate endpoint, sorted newest-first
-            if self.poc_number and self.provider_account_id:
-                try:
-                    today = date.today()
-                    prev_year = today.year - 1
+                total_balance = 0.0
+                invoices: list[Any] = []
+                pending: list[Any] = []
+                invoice_history: list[Any] = []
+                invoice_history_current: list[Any] = []
+                gas_index = 0
+                next_read_dates = None
+                index_history: list[Any] = []
+                balance_details_data: dict[str, Any] = {}
+                banners: list[Any] = []
 
-                    # Fetch previous year (Jan 1 – Dec 31, max 12 months)
-                    inv_hist_prev = await self.api.get_invoice_history(
-                        poc_number=self.poc_number,
-                        pa=self.provider_account_id,
-                        start_date=date(prev_year, 1, 1).isoformat(),
-                        end_date=date(prev_year, 12, 31).isoformat(),
+                if contract_accounts:
+                    balance_details = await self.api.get_balance_details(contract_accounts)
+                    if not balance_details.get("error"):
+                        balance_data = balance_details.get("data", {})
+                        total_balance = self._parse_amount(balance_data.get("total", 0.0))
+                        invoices = balance_data.get("invoices", [])
+                        pending = balance_data.get("pending", [])
+
+                    balance_widget = await self.api.get_balance_widget(contract_accounts)
+                    if not balance_widget.get("error"):
+                        balance_details_data = balance_widget.get("data", {})
+                else:
+                    _LOGGER.warning(
+                        "No contract accounts found for place %s, skipping balance fetch",
+                        place_key,
                     )
-                    if not inv_hist_prev.get("error"):
-                        raw = inv_hist_prev.get("data", [])
-                        if isinstance(raw, list):
-                            for group in raw:
-                                if isinstance(group, dict):
-                                    invoice_history.extend(group.get("invoices", []))
 
-                    # Fetch current year (Jan 1 – today)
-                    inv_hist_curr = await self.api.get_invoice_history(
-                        poc_number=self.poc_number,
-                        pa=self.provider_account_id,
-                        start_date=date(today.year, 1, 1).isoformat(),
-                        end_date=today.isoformat(),
-                    )
-                    if not inv_hist_curr.get("error"):
-                        raw = inv_hist_curr.get("data", [])
-                        if isinstance(raw, list):
-                            for group in raw:
-                                if isinstance(group, dict):
-                                    invoice_history_current.extend(group.get("invoices", []))
-                        invoice_history.extend(invoice_history_current)
-                except Exception as err:
-                    _LOGGER.debug("Could not fetch invoice history: %s", err)
+                if poc_number and pa:
+                    try:
+                        inv_hist_prev = await self.api.get_invoice_history(
+                            poc_number=poc_number,
+                            pa=pa,
+                            start_date=date(prev_year, 1, 1).isoformat(),
+                            end_date=date(prev_year, 12, 31).isoformat(),
+                        )
+                        if not inv_hist_prev.get("error"):
+                            raw = inv_hist_prev.get("data", [])
+                            if isinstance(raw, list):
+                                for group in raw:
+                                    if isinstance(group, dict):
+                                        invoice_history.extend(group.get("invoices", []))
 
-            # Index data — installation_number and pod are discovered from the response
-            gas_index = None
-            next_read_dates = None
-            index_history = []
-            if self.poc_number and self.provider_account_id:
-                try:
-                    index_data = await self.api.get_index_data(
-                        poc_number=self.poc_number,
-                        division="gaz",
-                        pa=self.provider_account_id,
-                        installation_number=self.installation_number or None,
-                    )
-                    if not index_data.get("error"):
-                        installations_data = index_data.get("data", [])
-                        if installations_data:
-                            first_inst = installations_data[0].get("installations", [])
-                            if first_inst:
-                                inst = first_inst[0]
-                                if inst.get("installation_number") and not self.installation_number:
-                                    self.installation_number = str(inst["installation_number"])
-                                    _LOGGER.debug("Discovered installation_number: %s", self.installation_number)
-                                if inst.get("pod") and not self.pod:
-                                    self.pod = str(inst["pod"])
-                                    _LOGGER.debug("Discovered pod: %s", self.pod)
-                                gas_index = inst.get("last_index", 0)
-                                next_read_dates = inst.get("next_read_dates")
-                    else:
-                        _LOGGER.warning("Index data fetch failed: %s", index_data)
-                except Exception as err:
-                    _LOGGER.debug("Could not fetch index data: %s", err)
+                        inv_hist_curr = await self.api.get_invoice_history(
+                            poc_number=poc_number,
+                            pa=pa,
+                            start_date=date(today.year, 1, 1).isoformat(),
+                            end_date=today.isoformat(),
+                        )
+                        if not inv_hist_curr.get("error"):
+                            raw = inv_hist_curr.get("data", [])
+                            if isinstance(raw, list):
+                                for group in raw:
+                                    if isinstance(group, dict):
+                                        invoice_history_current.extend(group.get("invoices", []))
+                            invoice_history.extend(invoice_history_current)
+                    except Exception as err:
+                        _LOGGER.debug(
+                            "Could not fetch invoice history for place %s: %s",
+                            place_key,
+                            err,
+                        )
 
-                # Consumption history (12 months)
-                try:
-                    end_date = date.today().isoformat()
-                    start_date = (date.today() - timedelta(days=365)).isoformat()
-                    consumption = await self.api.get_index_consumption(
-                        poc_number=self.poc_number,
-                        pa=self.provider_account_id,
-                        start_date=start_date,
-                        end_date=end_date,
+                    try:
+                        index_data = await self.api.get_index_data(
+                            poc_number=poc_number,
+                            division="gaz",
+                            pa=pa,
+                            installation_number=place.get("installation_number") or None,
+                        )
+                        if not index_data.get("error"):
+                            installations_data = index_data.get("data", [])
+                            if installations_data:
+                                first_inst = installations_data[0].get("installations", [])
+                                if first_inst:
+                                    inst = first_inst[0]
+                                    if inst.get("installation_number"):
+                                        place["installation_number"] = str(inst["installation_number"])
+                                    if inst.get("pod"):
+                                        place["pod"] = str(inst["pod"])
+                                    gas_index = inst.get("last_index", 0) or 0
+                                    next_read_dates = inst.get("next_read_dates")
+                        else:
+                            _LOGGER.warning(
+                                "Index data fetch failed for place %s: %s",
+                                place_key,
+                                index_data,
+                            )
+                    except Exception as err:
+                        _LOGGER.debug(
+                            "Could not fetch index data for place %s: %s",
+                            place_key,
+                            err,
+                        )
+
+                    try:
+                        consumption = await self.api.get_index_consumption(
+                            poc_number=poc_number,
+                            pa=pa,
+                            start_date=(today - timedelta(days=365)).isoformat(),
+                            end_date=today.isoformat(),
+                        )
+                        if not consumption.get("error"):
+                            index_history = consumption.get("data", [])
+                    except Exception as err:
+                        _LOGGER.debug(
+                            "Could not fetch consumption history for place %s: %s",
+                            place_key,
+                            err,
+                        )
+
+                    try:
+                        banner_data = await self.api.get_notifications_banner(
+                            poc_number=poc_number,
+                            pa=pa,
+                        )
+                        if not banner_data.get("error"):
+                            banner = banner_data.get("data", {})
+                            if banner:
+                                banners = [banner]
+                    except Exception as err:
+                        _LOGGER.debug(
+                            "Could not fetch banners for place %s: %s",
+                            place_key,
+                            err,
+                        )
+                else:
+                    _LOGGER.warning(
+                        "Place fetch skipped - missing poc=%s or pa=%s",
+                        poc_number,
+                        pa,
                     )
-                    if not consumption.get("error"):
-                        index_history = consumption.get("data", [])
-                except Exception as err:
-                    _LOGGER.debug("Could not fetch consumption history: %s", err)
-            else:
-                _LOGGER.warning(
-                    "Index fetch skipped - missing poc=%s or pa=%s",
-                    self.poc_number,
-                    self.provider_account_id,
+
+                invoice_history_current.sort(
+                    key=lambda inv: inv.get("invoiced_at", ""),
+                    reverse=True,
                 )
 
-            # Balance widget
-            balance_details_data = {}
-            if self.contract_accounts:
-                balance_widget = await self.api.get_balance_widget(self.contract_accounts)
-                if not balance_widget.get("error"):
-                    balance_details_data = balance_widget.get("data", {})
+                places_data[place_key] = {
+                    "place_key": place_key,
+                    "pa": pa,
+                    "poc_number": poc_number,
+                    "contract_accounts": contract_accounts,
+                    "installation_number": place.get("installation_number", ""),
+                    "pod": place.get("pod", ""),
+                    "place_name": place.get(
+                        "place_name", self._default_place_name(poc_number)
+                    ),
+                    "balance": total_balance,
+                    "gas_index": gas_index,
+                    "invoices": invoices,
+                    "invoice_history": invoice_history,
+                    "invoice_history_current": invoice_history_current,
+                    "pending": pending,
+                    "next_read_dates": next_read_dates,
+                    "balance_details": balance_details_data,
+                    "banners": banners,
+                    "index_history": index_history,
+                    "is_up_to_date": len(pending) == 0,
+                    "invoice_count": len(invoices),
+                }
 
-            # Notifications banner
-            banners = []
-            if self.poc_number and self.provider_account_id:
-                try:
-                    banner_data = await self.api.get_notifications_banner(
-                        poc_number=self.poc_number,
-                        pa=self.provider_account_id,
-                    )
-                    if not banner_data.get("error"):
-                        banners = [banner_data.get("data", {})]
-                except Exception as err:
-                    _LOGGER.debug("Could not fetch banners: %s", err)
-            else:
-                _LOGGER.warning(
-                    "Banner fetch skipped - missing poc=%s or pa=%s",
-                    self.poc_number,
-                    self.provider_account_id,
-                )
-
-            # Sort current-year invoices newest-first
-            invoice_history_current.sort(
-                key=lambda inv: inv.get("invoiced_at", ""),
-                reverse=True,
-            )
-
-            # Compile data
             data = {
-                "balance": float(total_balance.replace(",", ".")),
-                "gas_index": gas_index or 0,
-                "notifications": notification_count,
-                "invoices": invoices,
-                "invoice_history": invoice_history,
-                "invoice_history_current": invoice_history_current,
-                "pending": pending,
-                "next_read_dates": next_read_dates,
-                "balance_details": balance_details_data,
-                "banners": banners,
-                "index_history": index_history,
-                "is_up_to_date": len(pending) == 0,
-                "invoice_count": len(invoices),
-                "place_name": place_name,
+                "places": places_data,
             }
 
             _LOGGER.debug("Successfully fetched MyEngie data")
