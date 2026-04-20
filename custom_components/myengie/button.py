@@ -52,7 +52,7 @@ class MyEngieSubmitGasIndexButton(CoordinatorEntity, ButtonEntity):
     """Button that submits the staged gas index to ENGIE."""
 
     _attr_has_entity_name = True
-    _attr_name = "Submit Gas Index"
+    _attr_translation_key = "gas_index_submit"
     _attr_icon = "mdi:send"
 
     def __init__(self, coordinator, config_entry, place_key: str):

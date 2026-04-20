@@ -49,8 +49,18 @@
       "latest_invoice": {
         "name": "Ultima factură"
       },
-      "invoice_history": {
-        "name": "Istoric facturi"
+      "invoice_history_year": {
+        "name": "Istoric facturi {year}"
+      }
+    },
+    "number": {
+      "gas_index_input": {
+        "name": "Index gaz nou"
+      }
+    },
+    "button": {
+      "gas_index_submit": {
+        "name": "Transmite index gaz"
       }
     }
   }

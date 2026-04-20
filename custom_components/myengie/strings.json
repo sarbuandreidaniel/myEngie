@@ -49,8 +49,18 @@
       "latest_invoice": {
         "name": "Latest Invoice"
       },
-      "invoice_history": {
-        "name": "Invoice History"
+      "invoice_history_year": {
+        "name": "Invoice History {year}"
+      }
+    },
+    "number": {
+      "gas_index_input": {
+        "name": "New Gas Index"
+      }
+    },
+    "button": {
+      "gas_index_submit": {
+        "name": "Submit Gas Index"
       }
     }
   }

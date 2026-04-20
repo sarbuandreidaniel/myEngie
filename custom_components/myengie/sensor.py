@@ -162,7 +162,7 @@ class MyEngieBalanceSensor(MyEngiePlaceSensor):
     """Sensor for MyEngie balance."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_name = "Balance"
+    _attr_translation_key = "balance"
     _attr_native_unit_of_measurement = "RON"
     _attr_icon = "mdi:currency-eur"
 
@@ -183,7 +183,7 @@ class MyEngieBalanceSensor(MyEngiePlaceSensor):
 class MyEngieGasIndexSensor(MyEngiePlaceSensor):
     """Sensor for MyEngie gas index."""
 
-    _attr_name = "Gas Index"
+    _attr_translation_key = "gas_index"
     _attr_icon = "mdi:gauge"
     _attr_native_unit_of_measurement = "m³"
 
@@ -218,7 +218,7 @@ class MyEngieGasIndexSensor(MyEngiePlaceSensor):
 class MyEngieUpToDateStatusSensor(MyEngiePlaceSensor):
     """Sensor for account status (up to date or not)."""
 
-    _attr_name = "Account Status"
+    _attr_translation_key = "account_status"
     _attr_icon = "mdi:check-circle"
 
     def __init__(self, coordinator, config_entry, place_key: str):
@@ -239,7 +239,7 @@ class MyEngieUpToDateStatusSensor(MyEngiePlaceSensor):
 class MyEngieInvoiceCountSensor(MyEngiePlaceSensor):
     """Sensor for invoice count."""
 
-    _attr_name = "Invoice Count"
+    _attr_translation_key = "invoice_count"
     _attr_icon = "mdi:file-document"
 
     def __init__(self, coordinator, config_entry, place_key: str):
@@ -280,7 +280,7 @@ class MyEngieInvoiceCountSensor(MyEngiePlaceSensor):
 class MyEngiePendingPaymentsSensor(MyEngiePlaceSensor):
     """Sensor for pending payments."""
 
-    _attr_name = "Pending Payments"
+    _attr_translation_key = "pending_payments"
     _attr_icon = "mdi:alert-circle"
     _attr_native_unit_of_measurement = "RON"
 
@@ -331,7 +331,7 @@ class MyEngiePendingPaymentsSensor(MyEngiePlaceSensor):
 class MyEngieLatestInvoiceSensor(MyEngiePlaceSensor):
     """Sensor for latest invoice details."""
 
-    _attr_name = "Latest Invoice"
+    _attr_translation_key = "latest_invoice"
     _attr_icon = "mdi:receipt"
     _attr_device_class = SensorDeviceClass.MONETARY
 
@@ -390,7 +390,8 @@ class MyEngieInvoiceHistoryYearSensor(MyEngiePlaceSensor):
         """Initialize the sensor."""
         super().__init__(coordinator, config_entry, place_key)
         self._year = year
-        self._attr_name = f"Invoice History {year}"
+        self._attr_translation_key = "invoice_history_year"
+        self._attr_translation_placeholders = {"year": str(year)}
         self._set_sensor_ids(f"invoice_history_{year}")
 
     def _get_year_invoices(self):

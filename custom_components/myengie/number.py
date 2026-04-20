@@ -51,7 +51,7 @@ class MyEngieGasIndexNumber(CoordinatorEntity, NumberEntity):
     """Number entity for staging a new gas meter index before submission."""
 
     _attr_has_entity_name = True
-    _attr_name = "New Gas Index"
+    _attr_translation_key = "gas_index_input"
     _attr_icon = "mdi:counter"
     _attr_native_min_value = 0
     _attr_native_max_value = 999999
