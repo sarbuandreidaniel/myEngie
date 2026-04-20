@@ -15,18 +15,17 @@ O integrare profesională pentru Home Assistant care conectează contul tău **M
 
 ### Funcționalități disponibile
 - **Autentificare securizată** — Login prin Auth0, același mecanism ca aplicația oficială MyEngie
-- **Sold cont** — Soldul în timp real, exprimat în RON
+- **Sold și scadențe** — Soldul în timp real, data scadenței și zilele rămase până la scadență
 - **Index gaze** — Indexul curent de consum (m³) și fereastra pentru citirea următoare
-- **Facturi** — Istoricul complet pentru anul curent și cel precedent, ultima factură, plăți restante
-- **Stare cont** — Vizualizare rapidă dacă contul este la zi sau are restanțe
-- **Notificări** — Numărul de notificări necitite din contul ENGIE
-- **Detalii consum** — Senzor agregat cu date despre instalație, cod POC/POD și altele
+- **Identificatori instalație** — Cod POC, POD și numărul instalației pentru fiecare punct de consum
+- **Facturi** — Ultima factură, suma neachitată, scadența, indicator restanță
+- **Istoricul facturilor** — Totaluri anuale cu defalcare lunară pentru anul curent și cel precedent
+- **Consum lunar** — Consumul din luna precedentă (m³) și media lunară pe 12 luni
+- **Plăți restante** — Total și detalii plăți restante, inclusiv scadențele depășite
 
 ### În curând
 - 📋 Suport pentru consum electric (când API-ul devine disponibil)
-- 📋 Transmitere automată a indexului
 - 📋 Grafice și statistici de consum
-- 📋 Suport pentru mai multe instalații
 - 📋 Alerte de plată prin notificări HA
 
 ---
@@ -68,31 +67,45 @@ Integrarea se va autentifica, va prelua datele instalației tale și va crea aut
 
 ## Senzori disponibili
 
+Integrarea creează automat câte un set complet de senzori pentru fiecare **punct de consum** (instalație) din contul tău.
+
 | Senzor | Descriere | Unitate |
 |--------|-----------|---------|
-| `sensor.myengie_balance` | Soldul curent al contului | RON |
-| `sensor.myengie_gas_index` | Indexul de consum gaze | m³ |
-| `sensor.myengie_unread_notifications` | Notificări necitite | — |
-| `sensor.myengie_consumption_details` | Senzor rezumat cu 9+ atribute | — |
-| `sensor.myengie_account_status` | Stare cont: La zi / Restanțe | — |
-| `sensor.myengie_invoice_count` | Număr total facturi | — |
-| `sensor.myengie_pending_payments` | Total plăți restante | RON |
-| `sensor.myengie_latest_invoice` | Ultima factură: sumă, dată, scadență | RON |
-| `sensor.myengie_invoice_history_AAAA` | Istoricul facturilor pentru anul AAAA | — |
+| `sensor.myengie_<loc>_balance` | Soldul curent al contului | RON |
+| `sensor.myengie_<loc>_bill_due_date` | Data scadenței ultimei facturi | dată |
+| `sensor.myengie_<loc>_days_until_due` | Zile rămase până la scadență | zile |
+| `sensor.myengie_<loc>_invoice_amount` | Suma facturii neachitate | RON |
+| `sensor.myengie_<loc>_invoice_due_date` | Scadența facturii neachitate | dată |
+| `sensor.myengie_<loc>_invoice_number` | Numărul ultimei facturi | — |
+| `sensor.myengie_<loc>_invoice_overdue` | Factură cu scadența depășită | boolean |
+| `sensor.myengie_<loc>_invoice_count` | Număr total facturi | — |
+| `sensor.myengie_<loc>_pending_payments` | Total plăți restante | RON |
+| `sensor.myengie_<loc>_latest_invoice` | Ultima factură: sumă, dată, scadență | RON |
+| `sensor.myengie_<loc>_invoice_history_AAAA` | Total facturat în anul AAAA | RON |
+| `sensor.myengie_<loc>_gas_index` | Indexul curent de consum gaze | m³ |
+| `sensor.myengie_<loc>_poc_number` | Numărul punctului de consum (POC) | — |
+| `sensor.myengie_<loc>_pod` | Codul punctului de livrare (POD) | — |
+| `sensor.myengie_<loc>_installation_number` | Numărul instalației (contor) | — |
+| `sensor.myengie_<loc>_last_month_m3` | Consumul din luna precedentă | m³ |
+| `sensor.myengie_<loc>_monthly_avg_m3` | Media lunară a consumului (12 luni) | m³ |
 
-> Senzorii de istoric sunt generați automat pentru **anul curent** și **anul precedent**.
+> `<loc>` este derivat automat din denumirea locației sau numărul POC. Senzorii de istoric (`invoice_history_AAAA`) sunt generați automat pentru **anul curent** și **anul precedent**.
 
 ### Atribute senzori
 
-**`sensor.myengie_gas_index`** include:
+**`sensor.myengie_<loc>_gas_index`** include:
 - `next_read_start` — Începutul ferestrei pentru citirea indexului
 - `next_read_end` — Sfârșitul ferestrei pentru citirea indexului
 
-**`sensor.myengie_consumption_details`** include:
-- Index gaze, sold, număr notificări, număr facturi, plăți restante, stare cont, detalii instalație, coduri POC/POD și altele
+**`sensor.myengie_<loc>_invoice_history_AAAA`** include:
+- Lista completă de facturi cu sumă și dată emisie
+- `total_invoices`, `total_amount_paid`, `average_monthly_amount`, `average_daily_amount`
 
-**`sensor.myengie_invoice_history_AAAA`** include:
-- Lista completă de facturi cu sumă, dată emisie, scadență, stare (plătită/restantă) și totaluri
+**`sensor.myengie_<loc>_latest_invoice`** include:
+- `invoice_number`, `date`, `due_date`, `amount`, `paid`, `division`, `download_url`
+
+**`sensor.myengie_<loc>_pending_payments`** include:
+- `pending_count`, lista plăților cu `amount`, `due_date`, `description`
 
 ---
 

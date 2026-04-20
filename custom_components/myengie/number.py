@@ -53,7 +53,6 @@ class MyEngieGasIndexNumber(CoordinatorEntity, NumberEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "gas_index_input"
     _attr_icon = "mdi:counter"
-    _attr_native_min_value = 0
     _attr_native_max_value = 999999
     _attr_native_step = 1
     _attr_mode = NumberMode.BOX
@@ -100,6 +99,14 @@ class MyEngieGasIndexNumber(CoordinatorEntity, NumberEntity):
             "name": place_data.get("place_name", fallback_name),
             "manufacturer": "ENGIE Romania",
         }
+
+    @property
+    def native_min_value(self) -> float:
+        """Minimum allowed value is the last confirmed index."""
+        try:
+            return float(self.place_data.get("gas_index", 0) or 0)
+        except (TypeError, ValueError):
+            return 0
 
     @property
     def native_value(self) -> float | None:

@@ -28,17 +28,47 @@
       "balance": {
         "name": "Sold"
       },
+      "bill_due_date": {
+        "name": "Dată scadență"
+      },
+      "days_until_due": {
+        "name": "Zile până la scadență"
+      },
+      "invoice_amount": {
+        "name": "Sumă factură neachitată"
+      },
+      "invoice_due_date": {
+        "name": "Scadență factură neachitată"
+      },
+      "invoice_number": {
+        "name": "Număr factură"
+      },
+      "invoice_overdue": {
+        "name": "Factură restantă"
+      },
       "gas_index": {
         "name": "Index gaz"
+      },
+      "poc_number": {
+        "name": "Număr POC"
+      },
+      "pod": {
+        "name": "POD"
+      },
+      "installation_number": {
+        "name": "Număr instalație"
+      },
+      "last_month_m3": {
+        "name": "Consum luna precedentă"
+      },
+      "monthly_avg_m3": {
+        "name": "Consum mediu lunar"
       },
       "notifications": {
         "name": "Notificări necitite"
       },
       "consumption_details": {
         "name": "Detalii consum"
-      },
-      "account_status": {
-        "name": "Status cont"
       },
       "invoice_count": {
         "name": "Număr facturi"

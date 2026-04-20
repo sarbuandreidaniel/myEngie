@@ -28,17 +28,47 @@
       "balance": {
         "name": "Balance"
       },
+      "bill_due_date": {
+        "name": "Due Date"
+      },
+      "days_until_due": {
+        "name": "Days Until Due"
+      },
+      "invoice_amount": {
+        "name": "Unpaid Invoice Amount"
+      },
+      "invoice_due_date": {
+        "name": "Invoice Due Date"
+      },
+      "invoice_number": {
+        "name": "Invoice Number"
+      },
+      "invoice_overdue": {
+        "name": "Invoice Overdue"
+      },
       "gas_index": {
         "name": "Gas Index"
+      },
+      "poc_number": {
+        "name": "POC Number"
+      },
+      "pod": {
+        "name": "POD"
+      },
+      "installation_number": {
+        "name": "Meter Installation Number"
+      },
+      "last_month_m3": {
+        "name": "Previous Month Consumption"
+      },
+      "monthly_avg_m3": {
+        "name": "Monthly Average Consumption"
       },
       "notifications": {
         "name": "Unread Notifications"
       },
       "consumption_details": {
         "name": "Consumption Details"
-      },
-      "account_status": {
-        "name": "Account Status"
       },
       "invoice_count": {
         "name": "Invoice Count"
