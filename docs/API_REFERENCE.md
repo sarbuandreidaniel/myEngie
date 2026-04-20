@@ -99,6 +99,31 @@ browser inspection and network analysis.
 #     "domain": "https://myservices.engie.ro"
 # }
 
+# 3b. Submit Gas/Electricity Index
+# POST /v1/index
+# Purpose: Submit a self-read meter index value
+# Content-Type: application/json
+# Request Body:
+# {
+#     "poc_number": "5002533828",       # Point of Connection number
+#     "division": "gaz",                # "gaz" or "electric"
+#     "installation_number": 4002733447, # Integer — physical meter installation ID
+#     "index": "4500"                   # String — meter reading value
+# }
+# Notes:
+# - Only allowed when "permite_index": true in GET /v1/index response
+# - Submission window is defined by "next_read_dates" (startDate..endDate)
+# - "index" must be >= "last_index" to be accepted
+# Example Response (success):
+# {
+#     "error": false,
+#     "type": "GET",
+#     "description": "Transmiterea indexului s-a realizat cu succes",
+#     "data": {"status": true},
+#     "errors": [],
+#     "domain": "https://myservices.engie.ro"
+# }
+
 # 4. Balance Widget
 # POST /v1/widgets/ballance
 # Purpose: Get balance widget information

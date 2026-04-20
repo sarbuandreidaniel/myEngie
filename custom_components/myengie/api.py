@@ -147,6 +147,26 @@ class MyEngieAPI:
             params=params,
         )
 
+    async def submit_index(
+        self,
+        poc_number: str,
+        installation_number: str,
+        index_value: int,
+        division: str = "gaz",
+    ) -> Dict[str, Any]:
+        """Submit a gas/electricity meter reading."""
+        payload = {
+            "poc_number": poc_number,
+            "division": division,
+            "installation_number": int(installation_number),
+            "index": str(index_value),
+        }
+        return await self._request(
+            "POST",
+            f"{API_BASE_URL}/v1/index",
+            json_data=payload,
+        )
+
     async def get_banners(self) -> Dict[str, Any]:
         """Get banners."""
         return await self._request("POST", f"{API_BASE_URL}/v1/banners")
@@ -165,6 +185,7 @@ class MyEngieAPI:
         url: str,
         params: Optional[Dict[str, str]] = None,
         data: Optional[aiohttp.FormData] = None,
+        json_data: Optional[Dict[str, Any]] = None,
         _retrying: bool = False,
     ) -> Dict[str, Any]:
         """Make API request with automatic token refresh."""
@@ -194,6 +215,7 @@ class MyEngieAPI:
                 url,
                 params=params,
                 data=data,
+                json=json_data,
                 headers=headers,
             ) as response:
                 if response.status == 200:
@@ -210,7 +232,7 @@ class MyEngieAPI:
                     if not _retrying:
                         _LOGGER.debug("Attempting token refresh due to auth response")
                         if await self.auth_manager.refresh_access_token(self.session):
-                            return await self._request(method, url, params, data, _retrying=True)
+                            return await self._request(method, url, params, data, json_data, _retrying=True)
                     _LOGGER.error("Token refresh failed after auth failure")
                     return {"error": True, "data": {}, "reason": "token_refresh_failed"}
                 else:

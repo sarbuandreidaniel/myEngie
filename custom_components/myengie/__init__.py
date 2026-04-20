@@ -19,7 +19,7 @@ from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "number"]
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -269,6 +269,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                 invoice_history_current: list[Any] = []
                 gas_index = 0
                 next_read_dates = None
+                permite_index = False
                 index_history: list[Any] = []
                 balance_details_data: dict[str, Any] = {}
                 banners: list[Any] = []
@@ -344,6 +345,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                                         place["pod"] = str(inst["pod"])
                                     gas_index = inst.get("last_index", 0) or 0
                                     next_read_dates = inst.get("next_read_dates")
+                                    permite_index = bool(inst.get("permite_index", False))
                         else:
                             _LOGGER.warning(
                                 "Index data fetch failed for place %s: %s",
@@ -412,6 +414,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                     ),
                     "balance": total_balance,
                     "gas_index": gas_index,
+                    "permite_index": permite_index,
                     "invoices": invoices,
                     "invoice_history": invoice_history,
                     "invoice_history_current": invoice_history_current,
