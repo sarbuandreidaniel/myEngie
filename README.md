@@ -17,6 +17,7 @@ O integrare profesională pentru Home Assistant care conectează contul tău **M
 - **Autentificare securizată** — Login prin Auth0, același mecanism ca aplicația oficială MyEngie
 - **Sold și scadențe** — Soldul în timp real, data scadenței și zilele rămase până la scadență
 - **Index gaze** — Indexul curent de consum (m³) și fereastra pentru citirea următoare
+- **Trimitere index gaze** — Introdu și trimite indexul contorului direct din Home Assistant; disponibil doar în fereastra de autoîncasare
 - **Identificatori instalație** — Cod POC, POD și numărul instalației pentru fiecare punct de consum
 - **Facturi** — Ultima factură, suma neachitată, scadența, indicator restanță
 - **Istoricul facturilor** — Totaluri anuale cu defalcare lunară pentru anul curent și cel precedent
@@ -24,7 +25,7 @@ O integrare profesională pentru Home Assistant care conectează contul tău **M
 - **Plăți restante** — Total și detalii plăți restante, inclusiv scadențele depășite
 
 ### În curând
-- 📋 Suport pentru consum electric (când API-ul devine disponibil)
+- 📋 Suport pentru consum electric
 - 📋 Grafice și statistici de consum
 - 📋 Alerte de plată prin notificări HA
 
@@ -65,9 +66,11 @@ Integrarea se va autentifica, va prelua datele instalației tale și va crea aut
 
 ---
 
-## Senzori disponibili
+## Entități disponibile
 
-Integrarea creează automat câte un set complet de senzori pentru fiecare **punct de consum** (instalație) din contul tău.
+Integrarea creează automat câte un set complet de entități pentru fiecare **punct de consum** (instalație) din contul tău.
+
+### Senzori
 
 | Senzor | Descriere | Unitate |
 |--------|-----------|---------|
@@ -80,6 +83,18 @@ Integrarea creează automat câte un set complet de senzori pentru fiecare **pun
 | `sensor.myengie_<loc>_last_month_m3` | Consumul din luna precedentă | m³ |
 | `sensor.myengie_<loc>_consumption_history_AAAA` | Consum total gaze în anul AAAA | m³ |
 | `sensor.myengie_<loc>_invoice_history_AAAA` | Total facturat în anul AAAA | RON |
+
+### Trimitere index gaze
+
+| Entitate | Descriere | Disponibilitate |
+|----------|-----------|-----------------|
+| `number.myengie_<loc>_gas_index_input` | Index gaz de trimis (m³) | Doar în fereastra de autoîncasare |
+| `button.myengie_<loc>_gas_index_submit` | Trimite indexul gaz la ENGIE | Doar în fereastra de autoîncasare |
+
+Fluxul de lucru pentru transmiterea indexului:
+1. Setează valoarea dorită în `number.myengie_<loc>_gas_index_input` — valoarea minimă acceptată este indexul curent confirmat
+2. Apasă `button.myengie_<loc>_gas_index_submit` pentru a trimite indexul către ENGIE România
+3. Entitățile devin indisponibile automat în afara ferestrei de autoîncasare
 
 > `<loc>` este derivat automat din denumirea locației sau numărul POC. Senzorii de istoric sunt generați automat pentru **anul curent** și **anul precedent**.
 
@@ -168,8 +183,10 @@ custom_components/myengie/
 ├── __init__.py           # Configurare integrare și coordinator
 ├── api.py                # Client API MyEngie
 ├── auth.py               # Autentificare Auth0
+├── button.py             # Buton trimitere index gaze
 ├── config_flow.py        # Flux de configurare UI
 ├── const.py              # Constante
+├── number.py             # Input index gaze
 ├── sensor.py             # Entități senzori
 ├── manifest.json         # Metadate integrare
 └── translations/
