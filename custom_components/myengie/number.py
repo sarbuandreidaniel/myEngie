@@ -123,7 +123,7 @@ class MyEngieGasIndexNumber(CoordinatorEntity, NumberEntity):
     @property
     def available(self) -> bool:
         """Only available when the API reports index submission is open."""
-        return super().available and bool(self.place_data.get("permite_index", False))
+        return super().available and bool(self.place_data.get("in_submission_window", False))
 
     @property
     def extra_state_attributes(self) -> dict:

@@ -211,7 +211,22 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
         for place, alias in zip(self.places.values(), aliases):
             place["place_name"] = alias
 
-    async def _async_update_data(self) -> dict:
+    @staticmethod
+    def _is_in_read_window(next_read_dates: dict | None) -> bool:
+        """Return True if today falls within the API-reported index submission window."""
+        if not next_read_dates:
+            return False
+        try:
+            # API format: "DD-MM-YYYY" (e.g. "20-04-2026")
+            def _parse(val: str) -> date:
+                parts = val.strip().split("-")
+                return date(int(parts[2]), int(parts[1]), int(parts[0]))
+
+            start = _parse(str(next_read_dates.get("startDate", "")))
+            end = _parse(str(next_read_dates.get("endDate", "")))
+            return start <= date.today() <= end
+        except (ValueError, IndexError, TypeError):
+            return False
         """Fetch data from MyEngie API."""
         try:
             async with asyncio.timeout(60):
@@ -299,6 +314,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                 gas_index = 0
                 next_read_dates = None
                 permite_index = False
+                in_submission_window = False
                 index_history: list[Any] = []
                 balance_details_data: dict[str, Any] = {}
                 banners: list[Any] = []
@@ -375,6 +391,14 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                                     gas_index = inst.get("last_index", 0) or 0
                                     next_read_dates = inst.get("next_read_dates")
                                     permite_index = bool(inst.get("permite_index", False))
+                                    in_submission_window = permite_index and self._is_in_read_window(next_read_dates)
+                                    _LOGGER.debug(
+                                        "Place %s: permite_index=%s next_read_dates=%s in_window=%s",
+                                        place_key,
+                                        permite_index,
+                                        next_read_dates,
+                                        in_submission_window,
+                                    )
                         else:
                             _LOGGER.warning(
                                 "Index data fetch failed for place %s: %s",
@@ -444,6 +468,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                     "balance": total_balance,
                     "gas_index": gas_index,
                     "permite_index": permite_index,
+                    "in_submission_window": in_submission_window,
                     "invoices": invoices,
                     "invoice_history": invoice_history,
                     "invoice_history_current": invoice_history_current,

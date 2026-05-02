@@ -100,7 +100,7 @@ class MyEngieSubmitGasIndexButton(CoordinatorEntity, ButtonEntity):
     @property
     def available(self) -> bool:
         """Only available during the index submission window."""
-        return super().available and bool(self.place_data.get("permite_index", False))
+        return super().available and bool(self.place_data.get("in_submission_window", False))
 
     async def async_press(self) -> None:
         """Submit the staged gas index (or current index as fallback)."""
