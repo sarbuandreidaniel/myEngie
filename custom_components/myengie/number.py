@@ -20,7 +20,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up number entities for MyEngie."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
+    coordinator = config_entry.runtime_data
 
     def build_place_entities(place_keys: list[str]) -> list[NumberEntity]:
         return [
@@ -111,11 +111,7 @@ class MyEngieGasIndexNumber(CoordinatorEntity, NumberEntity):
     @property
     def native_value(self) -> float | None:
         """Return staged value if set, otherwise the latest confirmed index."""
-        pending = (
-            self.hass.data.get(DOMAIN, {})
-            .get(self.config_entry.entry_id, {})
-            .get("pending_gas_index", {})
-        )
+        pending = self.coordinator.pending_gas_index
         if self._place_key in pending:
             return float(pending[self._place_key])
         index = self.place_data.get("gas_index", 0)
@@ -127,7 +123,7 @@ class MyEngieGasIndexNumber(CoordinatorEntity, NumberEntity):
     @property
     def available(self) -> bool:
         """Only available when the API reports index submission is open."""
-        return bool(self.place_data.get("permite_index", False))
+        return super().available and bool(self.place_data.get("permite_index", False))
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -145,6 +141,5 @@ class MyEngieGasIndexNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Stage the value. Press the Submit Gas Index button to send it."""
-        pending = self.hass.data[DOMAIN][self.config_entry.entry_id]["pending_gas_index"]
-        pending[self._place_key] = int(value)
+        self.coordinator.pending_gas_index[self._place_key] = int(value)
         self.async_write_ha_state()

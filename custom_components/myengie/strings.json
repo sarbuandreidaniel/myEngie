@@ -8,19 +8,28 @@
           "username": "Email or Username",
           "password": "Password"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate MyEngie",
+        "description": "Your session has expired. Please re-enter your credentials.",
+        "data": {
+          "username": "Email or Username",
+          "password": "Password"
+        }
       }
     },
     "error": {
       "missing_username": "Username is required",
       "missing_password": "Password is required",
-      "invalid_auth": "Invalid credentials. Please check your username and password.",
+      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
       "account_locked": "Account temporarily locked due to too many failed login attempts. Please try again later.",
-      "cannot_connect": "Failed to connect to MyEngie services",
-      "unknown": "An unexpected error occurred"
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
     },
     "abort": {
-      "already_configured": "MyEngie is already configured",
-      "already_in_progress": "Configuration is already in progress"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_service%]",
+      "already_in_progress": "[%key:common::config_flow::abort::already_in_progress%]",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]"
     }
   },
   "entity": {
@@ -28,26 +37,29 @@
       "balance": {
         "name": "Current Balance"
       },
-      "gas_index": {
-        "name": "Gas Index"
-      },
-      "notifications": {
-        "name": "Unread Notifications"
-      },
-      "consumption_details": {
-        "name": "Consumption Details"
-      },
-      "account_status": {
-        "name": "Account Status"
-      },
       "unpaid_invoice": {
         "name": "Unpaid Invoice"
       },
-
-
-
+      "gas_index": {
+        "name": "Gas Index"
+      },
+      "poc_number": {
+        "name": "POC Number"
+      },
+      "pod": {
+        "name": "POD"
+      },
+      "installation_number": {
+        "name": "Meter Installation Number"
+      },
+      "last_month_m3": {
+        "name": "Previous Month Consumption"
+      },
       "invoice_history_year": {
         "name": "Invoice History {year}"
+      },
+      "consumption_history_year": {
+        "name": "Gas Consumption {year}"
       }
     },
     "number": {

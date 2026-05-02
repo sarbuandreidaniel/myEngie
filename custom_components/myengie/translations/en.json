@@ -8,6 +8,14 @@
           "username": "Email or Username",
           "password": "Password"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate MyEngie",
+        "description": "Your session has expired. Please re-enter your credentials.",
+        "data": {
+          "username": "Email or Username",
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -20,7 +28,8 @@
     },
     "abort": {
       "already_configured": "MyEngie is already configured",
-      "already_in_progress": "Configuration is already in progress"
+      "already_in_progress": "Configuration is already in progress",
+      "reauth_successful": "Re-authentication was successful"
     }
   },
   "entity": {
@@ -46,18 +55,6 @@
       "last_month_m3": {
         "name": "Previous Month Consumption"
       },
-      "monthly_avg_m3": {
-        "name": "Monthly Average Consumption"
-      },
-      "notifications": {
-        "name": "Unread Notifications"
-      },
-      "consumption_details": {
-        "name": "Consumption Details"
-      },
-
-
-
       "invoice_history_year": {
         "name": "Invoice History {year}"
       },

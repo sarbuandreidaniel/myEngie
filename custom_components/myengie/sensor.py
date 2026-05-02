@@ -12,7 +12,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfVolume
+from homeassistant.const import EntityCategory, UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -85,7 +85,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensors for MyEngie."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
+    coordinator = config_entry.runtime_data
 
     def build_place_entities(place_keys: list[str]) -> list[SensorEntity]:
         """Build all place-scoped entities for the provided place keys."""
@@ -259,7 +259,7 @@ class MyEngieGasIndexSensor(MyEngiePlaceSensor):
 
     _attr_translation_key = "gas_index"
     _attr_icon = "mdi:gauge"
-    _attr_native_unit_of_measurement = "m³"
+    _attr_native_unit_of_measurement = UnitOfVolume.CUBIC_METERS
 
     def __init__(self, coordinator, config_entry, place_key: str):
         """Initialize the sensor."""
@@ -424,6 +424,8 @@ class MyEngiePocNumberSensor(MyEngiePlaceSensor):
 
     _attr_translation_key = "poc_number"
     _attr_icon = "mdi:map-marker"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator, config_entry, place_key: str) -> None:
         super().__init__(coordinator, config_entry, place_key)
@@ -439,6 +441,8 @@ class MyEngiePodSensor(MyEngiePlaceSensor):
 
     _attr_translation_key = "pod"
     _attr_icon = "mdi:map-marker-check"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator, config_entry, place_key: str) -> None:
         super().__init__(coordinator, config_entry, place_key)
@@ -454,6 +458,8 @@ class MyEngieInstallationNumberSensor(MyEngiePlaceSensor):
 
     _attr_translation_key = "installation_number"
     _attr_icon = "mdi:counter"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator, config_entry, place_key: str) -> None:
         super().__init__(coordinator, config_entry, place_key)

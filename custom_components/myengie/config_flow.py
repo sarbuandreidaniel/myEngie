@@ -2,6 +2,7 @@
 
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 import aiohttp
@@ -27,8 +28,8 @@ class MyEngieConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Validate input
             try:
-                username = user_input.get("username", "").strip()
-                password = user_input.get("password", "")
+                username = user_input.get(CONF_USERNAME, "").strip()
+                password = user_input.get(CONF_PASSWORD, "")
 
                 if not username:
                     errors["base"] = "missing_username"
@@ -47,8 +48,8 @@ class MyEngieConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         return self.async_create_entry(
                             title=username,
                             data={
-                                "username": username,
-                                "password": password,
+                                CONF_USERNAME: username,
+                                CONF_PASSWORD: password,
                             },
                         )
             except Exception as err:
@@ -57,8 +58,8 @@ class MyEngieConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Required("username"): str,
-                vol.Required("password"): str,
+                vol.Required(CONF_USERNAME): str,
+                vol.Required(CONF_PASSWORD): str,
             }
         )
 
@@ -82,8 +83,48 @@ class MyEngieConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         except Exception as err:
             _LOGGER.error("Error validating credentials: %s", err)
             return False, "cannot_connect"
-            return False
 
-    async def async_step_import(self, import_data: dict) -> FlowResult:
-        """Handle import from configuration.yaml."""
-        return await self.async_step_user(import_data)
+    async def async_step_reauth(
+        self, entry_data: dict
+    ) -> FlowResult:
+        """Handle re-authentication triggered by ConfigEntryAuthFailed."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict | None = None
+    ) -> FlowResult:
+        """Show reauth form and process updated credentials."""
+        errors = {}
+        reauth_entry = self._get_reauth_entry()
+
+        if user_input is not None:
+            try:
+                username = user_input.get(CONF_USERNAME, "").strip()
+                password = user_input.get(CONF_PASSWORD, "")
+                valid, error_key = await self._validate_credentials(username, password)
+                if not valid:
+                    errors["base"] = error_key
+                else:
+                    return self.async_update_reload_and_abort(
+                        reauth_entry,
+                        data={**reauth_entry.data, CONF_USERNAME: username, CONF_PASSWORD: password},
+                    )
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error("Error during reauth: %s", err)
+                errors["base"] = "cannot_connect"
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_USERNAME,
+                    default=reauth_entry.data.get(CONF_USERNAME, ""),
+                ): str,
+                vol.Required(CONF_PASSWORD): str,
+            }
+        )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=schema,
+            errors=errors,
+        )

@@ -1,5 +1,6 @@
 """Custom integration for MyEngie Romania."""
 
+import asyncio
 import logging
 from datetime import date, timedelta
 from typing import Any
@@ -8,6 +9,7 @@ import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
@@ -21,10 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor", "number", "button"]
 
-
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the MyEngie component."""
-    return True
+_AUTH_REASONS = frozenset({"invalid_refresh_token", "token_refresh_failed", "no_token"})
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -37,18 +36,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create coordinator
     coordinator = MyEngieDataUpdateCoordinator(
         hass,
+        config_entry=entry,
         username=username,
         password=password,
     )
 
-    # Fetch initial data
+    # Fetch initial data — raises ConfigEntryNotReady on failure
     await coordinator.async_config_entry_first_refresh()
 
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {
-        "coordinator": coordinator,
-        "pending_gas_index": {},
-    }
+    entry.runtime_data = coordinator
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -65,9 +61,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry, PLATFORMS
     )
 
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-
     return unload_ok
 
 
@@ -77,6 +70,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
+        config_entry: ConfigEntry,
         username: str,
         password: str,
     ) -> None:
@@ -85,6 +79,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=DOMAIN,
+            config_entry=config_entry,
             update_interval=timedelta(seconds=DEFAULT_UPDATE_INTERVAL),
         )
         self.username = username
@@ -93,6 +88,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
         self.auth_manager: Auth0Manager | None = None
         self.api: MyEngieAPI | None = None
         self.places: dict[str, dict[str, Any]] = {}
+        self.pending_gas_index: dict[str, int] = {}
         self._is_initialized = False
 
     async def _async_authenticate(self) -> bool:
@@ -218,24 +214,39 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict:
         """Fetch data from MyEngie API."""
         try:
+            async with asyncio.timeout(60):
+                return await self._async_fetch_data()
+        except ConfigEntryAuthFailed:
+            raise
+        except UpdateFailed:
+            raise
+        except TimeoutError as err:
+            raise UpdateFailed("MyEngie API timed out") from err
+        except Exception as err:
+            _LOGGER.error("Error fetching MyEngie data: %s", err)
+            raise UpdateFailed(f"Error fetching MyEngie data: {err}")
+
+    async def _async_fetch_data(self) -> dict:
+        """Perform data fetch — always called from within asyncio.timeout context."""
+        try:
             # Authenticate if not already done
             if not self._is_initialized:
                 if not await self._async_authenticate():
-                    raise UpdateFailed("Failed to authenticate with MyEngie")
+                    raise ConfigEntryAuthFailed("Failed to authenticate with MyEngie")
 
             if not self.api:
-                raise UpdateFailed("API not initialized")
+                raise ConfigEntryAuthFailed("API not initialized — re-authentication required")
 
             _LOGGER.debug("Fetching data from MyEngie API")
 
             # App status — check for maintenance or invalid token, no account data here
             status = await self.api.get_app_status()
-            if status.get("reason") in ("invalid_refresh_token", "token_refresh_failed", "no_token"):
+            if status.get("reason") in _AUTH_REASONS:
                 _LOGGER.warning("MyEngie auth token invalid (%s), clearing auth and re-authenticating", status.get("reason"))
                 self._is_initialized = False
                 self.auth_manager = None
                 if not await self._async_authenticate():
-                    raise UpdateFailed("Failed to re-authenticate after token invalidation")
+                    raise ConfigEntryAuthFailed("Failed to re-authenticate after token invalidation")
                 status = await self.api.get_app_status()
             if status.get("error"):
                 _LOGGER.warning("App status check failed: %s", status)
@@ -248,7 +259,6 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning("placesofconsumption failed: %s", placesofconsumption)
                 # Silent auth expiry: token was accepted by app_status but expired by the
                 # time we fetched places — force a full re-login and retry once.
-                _AUTH_REASONS = ("invalid_refresh_token", "token_refresh_failed", "no_token")
                 if placesofconsumption.get("reason") in _AUTH_REASONS:
                     _LOGGER.debug(
                         "MyEngie: silent auth expiry detected — re-authenticating"
@@ -453,7 +463,7 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Successfully fetched MyEngie data")
             return data
 
-        except UpdateFailed:
+        except (ConfigEntryAuthFailed, UpdateFailed):
             raise
         except Exception as err:
             _LOGGER.error("Error fetching MyEngie data: %s", err)

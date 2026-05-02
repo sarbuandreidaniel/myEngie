@@ -21,7 +21,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up button entities for MyEngie."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
+    coordinator = config_entry.runtime_data
 
     def build_place_entities(place_keys: list[str]) -> list[ButtonEntity]:
         return [
@@ -100,7 +100,7 @@ class MyEngieSubmitGasIndexButton(CoordinatorEntity, ButtonEntity):
     @property
     def available(self) -> bool:
         """Only available during the index submission window."""
-        return bool(self.place_data.get("permite_index", False))
+        return super().available and bool(self.place_data.get("permite_index", False))
 
     async def async_press(self) -> None:
         """Submit the staged gas index (or current index as fallback)."""
@@ -114,11 +114,7 @@ class MyEngieSubmitGasIndexButton(CoordinatorEntity, ButtonEntity):
             )
 
         # Read the value staged by the number entity, fall back to current index
-        pending = (
-            self.hass.data.get(DOMAIN, {})
-            .get(self.config_entry.entry_id, {})
-            .get("pending_gas_index", {})
-        )
+        pending = self.coordinator.pending_gas_index
         index_value = pending.get(self._place_key)
         if index_value is None:
             index_value = int(place_data.get("gas_index", 0))
