@@ -227,6 +227,8 @@ class MyEngieDataUpdateCoordinator(DataUpdateCoordinator):
             return start <= date.today() <= end
         except (ValueError, IndexError, TypeError):
             return False
+
+    async def _async_update_data(self) -> dict:
         """Fetch data from MyEngie API."""
         try:
             async with asyncio.timeout(60):
